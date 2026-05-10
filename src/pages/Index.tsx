@@ -552,7 +552,7 @@ const Index = () => {
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[65] bg-background/95 backdrop-blur-sm overflow-y-auto"
           >
-            <div className="max-w-md mx-auto p-4 flex flex-col gap-4 min-h-full">
+            <div className="max-w-md mx-auto p-4 flex flex-col gap-4 min-h-full" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1rem)' }}>
               <div className="flex justify-end">
                 <button onClick={() => setHistoryPreview(null)} style={{ touchAction: 'manipulation' }} className="text-muted-foreground p-1">
                   <X className="w-5 h-5" />
@@ -658,7 +658,7 @@ const Index = () => {
             <div className="max-w-md mx-auto flex flex-col min-h-full">
 
               {/* Header */}
-              <div className="flex justify-end px-4 pt-4 pb-2 shrink-0">
+              <div className="flex justify-end px-4 pb-2 shrink-0" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1rem)' }}>
                 <button onClick={() => setWatchlistPreview(null)} style={{ touchAction: 'manipulation' }} className="text-muted-foreground p-1">
                   <X className="w-5 h-5" />
                 </button>
@@ -732,7 +732,7 @@ const Index = () => {
               exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
               className="fixed inset-x-0 bottom-0 max-w-md mx-auto flex flex-col bg-card border border-border rounded-t-2xl overflow-hidden"
-              style={{ top: 0 }}
+              style={{ top: 'env(safe-area-inset-top)' }}
               onClick={e => e.stopPropagation()}
             >
               <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
