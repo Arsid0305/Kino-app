@@ -19,8 +19,14 @@ jobs:
           node-version: 22
           cache: 'npm'
 
-      - name: Install & build
-        run: npm ci && npm run build
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Security audit
+        run: npm audit --audit-level=high
+
+      - name: Build
+        run: npm run build
 
       - name: Merge dev into main
         run: |
