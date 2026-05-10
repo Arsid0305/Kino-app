@@ -38,68 +38,68 @@ Claude меняет только то, что обсудили и что пол�
 | Тени, glow | `kino-design-system/kino-app/preview/shadows-glow.html` |
 | Отступы | `kino-design-system/kino-app/preview/spacing-tokens.html` |
 
-**Никогда не выдумывай UI с нуля.** Открой нужный файл, скопируй классы/токены, перевоплоти в Tailwind. Если пользователь говорит «как на телефоне» / «как было» / «не похоже» — точно нарушено это правило, иди в design system.
+**Никогда не выдумывай UI с нуля.** Открой нужный файл, скопируй классы/токены, перевоплоти в Tailwind.
 
 Design system — отдельный репо `github.com/Arsid0305/design-system`, подключён как git submodule в папку `kino-design-system/`.
-Перед чтением файлов — инициализировать: `git submodule update --init`
-Обновить до последней версии: `git submodule update --remote`
+Инициализировать: `git submodule update --init`
+Обновить: `git submodule update --remote`
 
 ---
 
 ## Инфраструктура (настроена, не трогать)
 
-### Хостинг
-- **Фронтенд**: Vercel — подключён к GitHub, деплоит автоматически при пуше в `main`
+- **Фронтенд**: Vercel — деплоит автоматически при пуше в `main`
 - **Бэкенд**: Supabase Edge Functions — деплоит автоматически через GitHub Actions
 - **БД и Auth**: Supabase, проект `ovhwxfdtkzwxfomdlgjv`
-- **Репо**: github.com/arsid0305/kino-app, основная ветка `main`
-
-### GitHub Actions (автоматический деплой)
-- `.github/workflows/automerge.yml` — любая ветка → `dev` (авто, без проверок)
-- `.github/workflows/promote.yml` — `dev` → `main` (только после `npm run build`)
-- `.github/workflows/deploy.yml` — деплоит Edge Functions при изменении `supabase/functions/**`
-- Секрет: `SBP_ACCESS_TOKEN` (Supabase Access Token) — уже добавлен в GitHub Secrets
-- Права Actions: Read and write permissions — включены
-
-### API ключи (уже в Supabase Secrets)
-- `ANTHROPIC_API_KEY` ✅
-- `OPENAI_API_KEY` ✅
-- `GOOGLE_API_KEY` ✅
-- `DEEPSEEK_API_KEY` ✅
-- `TAVILY_API_KEY` (опционально)
+- **Репо**: github.com/arsid0305/kino-app
+- `.github/workflows/automerge.yml` — любая ветка → `dev`
+- `.github/workflows/promote.yml` — `dev` → `main` после `npm run build`
+- `.github/workflows/deploy.yml` — Edge Functions при изменении `supabase/functions/**`
 
 ---
 
-## Стек приложения
+## Стек
 
-- **Фронтенд**: React + Vite + TypeScript + Tailwind + shadcn/ui
-- **Анимации**: Framer Motion
-- **Excel-парсинг**: xlsx (runtime)
-- **БД**: Supabase (таблицы: `user_movies`, `chat_messages`)
-- **Auth**: Supabase Auth (email OTP + анонимный)
-- **Edge Functions** (Deno):
-  - `ai-chat` — мультипровайдерный AI чат (Claude / GPT / Gemini / DeepSeek)
-  - `movie-recommendation` — подбор фильмов через DeepSeek
-
-### devDependencies (не в рантайме)
-- `@resvg/resvg-js` — конвертация SVG → PNG для генерации PWA-иконок (`public/icon-192.png`, `public/icon-512.png`). Запускать через `node scripts/...` при смене иконки.
+- React + Vite + TypeScript + Tailwind + shadcn/ui + Framer Motion
+- Supabase Auth (email OTP + анонимный), Edge Functions (Deno)
+- `ai-chat`, `movie-recommendation`
 
 ---
 
-## Среда Claude (что доступно в чате)
+## Среда Claude
 
 | Инструмент | Статус |
 |-----------|--------|
 | Node.js v22 | ✅ |
 | npm v10 | ✅ |
-| Git v2.43 | ✅ |
-| Vite v8 | ✅ |
-| Supabase CLI | ❌ Не работает |
-| Deno | ❌ Не установлен |
-| node_modules | ❌ Нет (есть package-lock.json, установить через `npm ci`) |
-| .env реальный | ❌ Только .env.example |
+| Supabase CLI | ❌ |
+| Deno | ❌ |
+| node_modules | ❌ (есть package-lock.json, `npm ci`) |
+| .env реальный | ❌ (только .env.example) |
 
-Claude может писать и пушить код. Собрать фронтенд и задеплоить функции вручную — не может. Всё через GitHub Actions + Vercel автоматически.
+---
+
+## Subagents
+
+Использовать для:
+- Исследования и анализа кода (не засорять основной контекст)
+- Параллельных независимых задач
+
+Один subagent — одна фокусная задача.
+
+---
+
+## Выбор модели для subagents
+
+При запуске subagent всегда явно указывать `model`:
+
+| Модель | Когда использовать |
+|---------|-------------------|
+| `haiku` | Поиск файлов, чтение кода, grep, простые запросы — быстро и дёшево |
+| `sonnet` | Написание кода, отладка, стандартные задачи — баланс качества и цены |
+| `opus` | Архитектура, сложный анализ, планирование BIG-задач — максимальное качество |
+
+По умолчанию — `sonnet`. Переключаться на `haiku` если задача простая, на `opus` только если требуется глубокое архитектурное решение.
 
 ---
 
@@ -108,9 +108,8 @@ Claude может писать и пушить код. Собрать фронт
 1. Claude пишет код → пушит в ветку `claude/...`
 2. `automerge.yml` мержит ветку в `dev` автоматически
 3. `promote.yml` мержит `dev` → `main` после успешного билда
-4. Vercel деплоит фронтенд автоматически (1-2 мин)
-5. GitHub Actions деплоит Edge Functions автоматически (1-2 мин)
-6. Тестируем на проде
+4. Vercel + Actions деплоят автоматически (1-2 мин)
+5. Тестируем на проде
 
 ## Правила Git
 
@@ -122,41 +121,12 @@ Claude может писать и пушить код. Собрать фронт
 
 ## Открытые баги
 
-_(пусто — фикси по мере поступления)_
+_(пусто)_
 
 ---
 
-## Папка проекта на машине пользователя
+## Папка проекта
 
 ```
 C:\DATA\AI_OS\projects\Kino-app
-```
-
-Локальная синхронизация (`pull-all.bat` в `C:\DATA\AI_OS\`):
-```bat
-@echo off
-echo Синхронизация всех проектов...
-
-echo [1/5] Kino-app
-cd /d C:\DATA\AI_OS\projects\Kino-app
-git pull origin main
-
-echo [2/5] WB_bot
-cd /d C:\DATA\AI_OS\projects\WB_bot
-git pull origin main
-
-echo [3/5] Response_bot
-cd /d C:\DATA\AI_OS\projects\Response_bot
-git pull origin main
-
-echo [4/5] Skincare_Guide
-cd /d C:\DATA\AI_OS\projects\Skincare_Guide
-git pull origin main
-
-echo [5/5] Technical_language
-cd /d C:\DATA\AI_OS\projects\Technical_language
-git pull origin main
-
-echo Готово!
-pause
 ```
