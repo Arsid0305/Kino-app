@@ -206,23 +206,12 @@ Design system — отдельный репо `github.com/Arsid0305/design-syste
 
 Claude инициирует проверку сам перед первым деплоем в `main`. Молча не пропускать.
 
-### Secrets & ключи
-- [ ] `service_role` ключ нигде в `VITE_` переменных — только в Edge Functions или GitHub Secrets
-- [ ] `.env` файлы в `.gitignore`, не попали в историю git
-- [ ] В `vite.config.ts` нет `build.sourcemap: true`
-
-### Supabase RLS
-- [ ] RLS включён на **каждой** таблице в `public` схеме
-- [ ] Политики используют `auth.uid() = user_id`, не открыты анонимам
-
-### Edge Functions
-- [ ] Каждая функция верифицирует JWT: `supabase.auth.getUser(token)` → 401 если невалидный
-- [ ] Входные данные валидируются через `zod` до любого обращения к БД
-- [ ] CORS ограничен: `Access-Control-Allow-Origin: https://DOMAIN.com` (не `*`)
-
-### CI/CD
-- [ ] В каждом workflow файле: `permissions: contents: read`
-- [ ] `npm audit --audit-level=high` добавлен как шаг перед билдом
+- [ ] Нет секретов в коде (ключи, пароли, токены)
+- [ ] `ALLOWED_ORIGINS` установлен в Supabase Secrets
+- [ ] RLS включён на всех таблицах Supabase
+- [ ] Входные данные валидируются через `zod` перед использованием
+- [ ] `npm audit --audit-level=high` не показывает критических уязвимостей
+- [ ] В каждом workflow: `permissions: contents: read`
 
 ---
 
@@ -233,8 +222,16 @@ Claude инициирует проверку сам перед первым де
 - **БД и Auth**: Supabase, проект `ovhwxfdtkzwxfomdlgjv`
 - **Репо**: github.com/arsid0305/kino-app
 - `.github/workflows/automerge.yml` — любая ветка → `dev`
-- `.github/workflows/promote.yml` — `dev` → `main` после `npm run build`
+- `.github/workflows/promote.yml` — `dev` → `main` после `npm run build` + audit
 - `.github/workflows/deploy.yml` — Edge Functions при изменении `supabase/functions/**`
+- `SBP_ACCESS_TOKEN` — в GitHub Secrets ✅
+
+### API ключи (в Supabase Secrets)
+- `ANTHROPIC_API_KEY` ✅
+- `OPENAI_API_KEY` ✅
+- `GOOGLE_API_KEY` ✅
+- `DEEPSEEK_API_KEY` ✅
+- `ALLOWED_ORIGINS` — добавить значение `https://kino-app.vercel.app`
 
 ---
 
@@ -243,6 +240,8 @@ Claude инициирует проверку сам перед первым де
 - React + Vite + TypeScript + Tailwind + shadcn/ui + Framer Motion
 - Supabase Auth (email OTP + анонимный), Edge Functions (Deno)
 - `ai-chat`, `movie-recommendation`
+- `xlsx` — парсинг Excel
+- `@resvg/resvg-js` — devDep, SVG → PNG для PWA-иконок
 
 ---
 
