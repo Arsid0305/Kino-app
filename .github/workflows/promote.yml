@@ -29,3 +29,9 @@ jobs:
           git checkout main
           git merge --no-ff dev -m "Promote dev to main"
           git push origin main
+
+      - name: Sync main back to dev
+        run: |
+          git checkout dev
+          git merge --no-ff main -m "Sync main back to dev"
+          git push origin dev
