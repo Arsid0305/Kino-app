@@ -247,7 +247,7 @@ Claude инициирует проверку сам перед первым де
 - [ ] CORS ограничен: `Access-Control-Allow-Origin: https://kino-app.vercel.app` (не `*`)
 
 ### CI/CD
-- [ ] В каждом workflow файле: `permissions: contents: read` (минимальные права)
+- [ ] В каждом workflow файле: `permissions: contents: write` (для push)
 - [ ] Actions закреплены по commit SHA, не по тегу
 - [ ] `npm audit --audit-level=high` добавлен как шаг перед билдом
 - [ ] Секреты не выводятся в `run:` шагах через `echo`
