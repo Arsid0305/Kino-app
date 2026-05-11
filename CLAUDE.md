@@ -268,8 +268,8 @@ Claude инициирует проверку сам перед первым де
 - **Бэкенд**: Supabase Edge Functions — деплоит автоматически через GitHub Actions
 - **БД и Auth**: Supabase, проект `ovhwxfdtkzwxfomdlgjv`
 - **Репо**: github.com/arsid0305/kino-app
-- `.github/workflows/automerge.yml` — любая ветка → `dev`
-- `.github/workflows/promote.yml` — `dev` → `main` после `npm run build` + audit
+- `.github/workflows/automerge.yml` — любая ветка → `dev`, конфликты разрешаются `-X theirs`
+- `.github/workflows/promote.yml` — `dev` → `main` после `npm run build` + sync `main` → `dev`
 - `.github/workflows/deploy.yml` — Edge Functions при изменении `supabase/functions/**`
 - `SBP_ACCESS_TOKEN` — в GitHub Secrets ✅
 
@@ -353,10 +353,10 @@ package.json
 
 1. Claude пишет код → пушит в ветку `claude/...`
 2. После каждого пуша — создать PR в `dev` (если не существует)
-3. `automerge.yml` мержит ветку в `dev` автоматически
+3. `automerge.yml` мержит ветку в `dev` автоматически (`-X theirs` — конфликты разрешаются в пользу входящей ветки)
 4. После успешного билда — спросить пользователя: **«Мержить в main?»** и ждать ответа
 5. Никогда не мержить в `main` без явного подтверждения пользователя
-6. После мержа в `main` — деплой происходит автоматически (Vercel / GitHub Actions)
+6. После мержа в `main` — `promote.yml` автоматически синхронизирует `main` обратно в `dev`
 
 ---
 
