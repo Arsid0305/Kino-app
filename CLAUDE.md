@@ -312,6 +312,7 @@ package.json
 - React + Vite + TypeScript + Tailwind + shadcn/ui + Framer Motion
 - Supabase Auth (email OTP + анонимный), Edge Functions (Deno)
 - `ai-chat`, `movie-recommendation`
+- Тесты: Vitest (`npm test`)
 - Design System: git submodule (`kino-design-system/`)
 - Python: нет
 
@@ -324,6 +325,7 @@ package.json
 | Node.js v22 | ✅ |
 | npm v10 | ✅ |
 | Python | ❌ |
+| Vitest | ✅ (`npm test`) |
 | Supabase CLI | ❌ не установлен — деплой только через GitHub Actions |
 | Deno | ❌ не установлен — Edge Functions только через CI/CD |
 | node_modules | ❌ (есть package-lock.json, `npm ci`) |
