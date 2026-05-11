@@ -292,6 +292,7 @@ Claude инициирует проверку сам перед первым де
     deploy.yml
 .gitignore
 .env.example
+.cursorrules          — правила для Cursor IDE (аналог CLAUDE.md для Cursor)
 CLAUDE.md
 README.md
 tasks/
