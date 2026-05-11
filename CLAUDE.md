@@ -8,7 +8,13 @@ Claude меняет только то, что обсудили и что пол�
 
 **Исключение:** баг внутри уже согласованного скоупа задачи — чини сам, сообщи после.
 
-> **Правило для Claude**: Читай этот файл и `tasks/lessons.md` в начале каждого чата. В конце чата — обновляй «Открытые баги» и `tasks/lessons.md`.
+> Правило: Читай этот файл и `tasks/lessons.md` в начале каждого чата. В конце чата — обновляй «Открытые баги» и `tasks/lessons.md`.
+
+---
+
+## Глобальный стандарт
+
+Этот файл создан на основе `github.com/Arsid0305/TEMPLATE`. При появлении нового паттерна — предложить для обсуждения, после одобрения внести в глобальный стандарт.
 
 ---
 
@@ -32,6 +38,31 @@ git clone https://github.com/Arsid0305/TEMPLATE /tmp/arsid-template
 ```
 
 Репо публичное — работает без токена.
+
+---
+
+## ⚠️ ОБЯЗАТЕЛЬНО ПРИ ЛЮБЫХ UI-ПРАВКАХ
+
+**Перед изменением любого UI-компонента (карточки, кнопки, плашки, чипы, шапка, чат, формы)** — сначала прочитай соответствующий файл из папки `kino-design-system/kino-app/preview/`:
+
+| Что меняешь | Файл в design system |
+|-------------|---------------------|
+| Карточка фильма (MovieCard, чат-карточки) | `kino-design-system/kino-app/preview/component-cards.html` |
+| Кнопки (action buttons) | `kino-design-system/kino-app/preview/component-buttons.html` |
+| Чипы (фильтры, теги жанров/настроений) | `kino-design-system/kino-app/preview/component-chips.html` |
+| Шапка + табы + stat-карточки счётчиков | `kino-design-system/kino-app/preview/component-nav.html` |
+| Чат-окно AI | `kino-design-system/kino-app/preview/component-chat.html` |
+| Форма входа / OTP / профиль | `kino-design-system/kino-app/preview/component-auth.html` |
+| Цвета, фоны, primary/secondary | `kino-design-system/kino-app/preview/colors-base.html`, `colors-semantic.html` |
+| Шрифты (display/body) | `kino-design-system/kino-app/preview/type-display.html`, `type-body.html` |
+| Тени, glow | `kino-design-system/kino-app/preview/shadows-glow.html` |
+| Отступы | `kino-design-system/kino-app/preview/spacing-tokens.html` |
+
+**Никогда не выдумывай UI с нуля.** Открой нужный файл, скопируй классы/токены, перевоплоти в Tailwind.
+
+Design system — отдельный репо `github.com/Arsid0305/design-system`, подключён как git submodule в папку `kino-design-system/`.
+Инициализировать: `git submodule update --init`
+Обновить: `git submodule update --remote`
 
 ---
 
@@ -213,7 +244,7 @@ Claude инициирует проверку сам перед первым де
 - [ ] Каждая функция верифицирует JWT: `supabase.auth.getUser(token)` → 401 если невалидный
 - [ ] Никаких user_id из тела запроса — только из верифицированного токена
 - [ ] Входные данные валидируются через `zod` до любого обращения к БД
-- [ ] CORS ограничен: `Access-Control-Allow-Origin: https://DOMAIN.com` (не `*`)
+- [ ] CORS ограничен: `Access-Control-Allow-Origin: https://kino-app.vercel.app` (не `*`)
 
 ### CI/CD
 - [ ] В каждом workflow файле: `permissions: contents: read` (минимальные права)
@@ -233,14 +264,21 @@ Claude инициирует проверку сам перед первым де
 
 ## Инфраструктура (настроена, не трогать)
 
-- **Фронтенд**: Vercel — деплоит автоматически при пуше в `main` ✅
-- **Бэкенд**: Supabase Edge Functions — деплоит автоматически через GitHub Actions ✅
-- **БД и Auth**: Supabase, проект `ovhwxfdtkzwxfomdlgjv` ✅
+- **Фронтенд**: Vercel — деплоит автоматически при пуше в `main`
+- **Бэкенд**: Supabase Edge Functions — деплоит автоматически через GitHub Actions
+- **БД и Auth**: Supabase, проект `ovhwxfdtkzwxfomdlgjv`
 - **Репо**: github.com/arsid0305/kino-app
-- Workflows:
-  - `automerge.yml` — ветка `claude/...` → `dev` ✅
-  - `promote.yml` — `dev` → `main` после `npm run build` ✅
-  - `deploy.yml` — Edge Functions при изменении `supabase/functions/**` ✅
+- `.github/workflows/automerge.yml` — любая ветка → `dev`
+- `.github/workflows/promote.yml` — `dev` → `main` после `npm run build` + audit
+- `.github/workflows/deploy.yml` — Edge Functions при изменении `supabase/functions/**`
+- `SBP_ACCESS_TOKEN` — в GitHub Secrets ✅
+
+### API ключи (в Supabase Secrets)
+- `ANTHROPIC_API_KEY` ✅
+- `OPENAI_API_KEY` ✅
+- `GOOGLE_API_KEY` ✅
+- `DEEPSEEK_API_KEY` ✅
+- `ALLOWED_ORIGINS` — добавить значение `https://kino-app.vercel.app`
 
 ---
 
@@ -270,13 +308,11 @@ package.json
 
 ## Стек
 
-- **Фронтенд**: React + Vite + TypeScript + Tailwind + shadcn/ui
-- **Анимации**: Framer Motion
-- **Auth**: Supabase email OTP + анонимный
-- **Бэкенд**: Edge Functions Deno (`ai-chat`, `movie-recommendation`)
-- **БД**: Supabase
-- **Design System**: git submodule (`kino-design-system/`)
-- **Python**: нет
+- React + Vite + TypeScript + Tailwind + shadcn/ui + Framer Motion
+- Supabase Auth (email OTP + анонимный), Edge Functions (Deno)
+- `ai-chat`, `movie-recommendation`
+- Design System: git submodule (`kino-design-system/`)
+- Python: нет
 
 ---
 
@@ -287,8 +323,8 @@ package.json
 | Node.js v22 | ✅ |
 | npm v10 | ✅ |
 | Python | ❌ |
-| Supabase CLI | ❌ не установлен — деплой Edge Functions только через GitHub Actions |
-| Deno | ❌ не установлен — Edge Functions нельзя запустить локально |
+| Supabase CLI | ❌ не установлен — деплой только через GitHub Actions |
+| Deno | ❌ не установлен — Edge Functions только через CI/CD |
 | node_modules | ❌ (есть package-lock.json, `npm ci`) |
 | .env реальный | ❌ (только .env.example) |
 
@@ -305,33 +341,6 @@ package.json
 - `date-fns` — форматирование дат
 - `xlsx` — парсинг Excel-файлов
 - `@resvg/resvg-js` — SVG → PNG (devDependency, для иконок PWA)
-
----
-
-## Design System
-
-Репо: `github.com/Arsid0305/design-system` — подключён как git submodule в папку `kino-design-system/`.
-Инициализировать: `git submodule update --init`
-Обновить: `git submodule update --remote`
-
-### ⚠️ ОБЯЗАТЕЛЬНО ПРИ ЛЮБЫХ UI-ПРАВКАХ
-
-**Перед изменением любого UI-компонента** — сначала прочитай соответствующий файл из `kino-design-system/kino-app/preview/`:
-
-| Что меняешь | Файл в design system |
-|-------------|---------------------|
-| Карточка фильма (MovieCard, чат-карточки) | `component-cards.html` |
-| Кнопки (action buttons) | `component-buttons.html` |
-| Чипы (фильтры, теги жанров/настроений) | `component-chips.html` |
-| Шапка + табы + stat-карточки счётчиков | `component-nav.html` |
-| Чат-окно AI | `component-chat.html` |
-| Форма входа / OTP / профиль | `component-auth.html` |
-| Цвета, фоны, primary/secondary | `colors-base.html`, `colors-semantic.html` |
-| Шрифты (display/body) | `type-display.html`, `type-body.html` |
-| Тени, glow | `shadows-glow.html` |
-| Отступы | `spacing-tokens.html` |
-
-**Никогда не выдумывать UI с нуля.** Открыть нужный файл, скопировать классы/токены, перевоплотить в Tailwind.
 
 ---
 
