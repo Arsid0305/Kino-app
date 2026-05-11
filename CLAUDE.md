@@ -28,6 +28,19 @@ Claude меняет только то, что обсудили и что пол�
 
 ---
 
+## TEMPLATE репо — автодоступ
+
+`github.com/Arsid0305/TEMPLATE` содержит шаблоны для всех проектов.
+
+Claude читает его через git:
+```bash
+git clone https://github.com/Arsid0305/TEMPLATE /tmp/arsid-template
+```
+
+Репо публичное — работает без токена.
+
+---
+
 ## ⚠️ ОБЯЗАТЕЛЬНО ПРИ ЛЮБЫХ UI-ПРАВКАХ
 
 **Перед изменением любого UI-компонента (карточки, кнопки, плашки, чипы, шапка, чат, формы)** — сначала прочитай соответствующий файл из папки `kino-design-system/kino-app/preview/`:
@@ -93,6 +106,7 @@ Design system — отдельный репо `github.com/Arsid0305/design-syste
 ### Тесты
 - Покрытие (unit, integration, e2e)
 - Непокрытые сценарии отказа
+- Качество assertions
 
 ### Производительность
 - N+1 запросы, неэффективный I/O
@@ -192,13 +206,24 @@ Design system — отдельный репо `github.com/Arsid0305/design-syste
 
 ### Ключевые инструменты
 
-- `ctx_execute` — запустить код в sandbox. В контекст идёт только stdout. Экономия: 56 KB → 299 B
+- `ctx_execute` — запустить код в sandbox (JS/TS/Python/Shell/+8 языков). В контекст идёт только stdout. Экономия: 56 KB → 299 B
 - `ctx_execute_file` — обработать файл в sandbox (grep, парсинг, анализ)
 - `ctx_batch_execute` — несколько команд в одном вызове
 - `ctx_fetch_and_index` — загрузить URL, сжать, проиндексировать (кэш 24 ч)
-- `ctx_search` — поиск по проиндексированному контенту
+- `ctx_search` — поиск по проиндексированному контенту (BM25 + FTS5)
 - `ctx_index` — проиндексировать markdown-текст
 - `ctx_stats` — статистика сессии и экономия токенов
+
+### Сессионная память
+
+При компрессии контекста context-mode сохраняет состояние сессии в SQLite и восстанавливает при старте. Claude не теряет нить — знает какие файлы редактировал, какие задачи были в процессе.
+
+### Диагностика
+
+```bash
+context-mode doctor   # проверить установку, хуки, рантаймы
+ctx_stats             # статистика экономии токенов за сессию
+```
 
 ---
 
@@ -206,12 +231,34 @@ Design system — отдельный репо `github.com/Arsid0305/design-syste
 
 Claude инициирует проверку сам перед первым деплоем в `main`. Молча не пропускать.
 
-- [ ] Нет секретов в коде (ключи, пароли, токены)
-- [ ] `ALLOWED_ORIGINS` установлен в Supabase Secrets
-- [ ] RLS включён на всех таблицах Supabase
-- [ ] Входные данные валидируются через `zod` перед использованием
-- [ ] `npm audit --audit-level=high` не показывает критических уязвимостей
-- [ ] В каждом workflow: `permissions: contents: read`
+### Secrets & ключи
+- [ ] `service_role` ключ нигде в `VITE_` переменных — только в Edge Functions или GitHub Secrets
+- [ ] `.env` файлы в `.gitignore`, не попали в историю git (`git log --all -- .env`)
+- [ ] В `vite.config.ts` нет `build.sourcemap: true` (исходники не отдаются в браузер)
+
+### Supabase RLS
+- [ ] RLS включён на **каждой** таблице в `public` схеме
+- [ ] Политики используют `auth.uid() = user_id`, не открыты анонимам
+
+### Edge Functions
+- [ ] Каждая функция верифицирует JWT: `supabase.auth.getUser(token)` → 401 если невалидный
+- [ ] Никаких user_id из тела запроса — только из верифицированного токена
+- [ ] Входные данные валидируются через `zod` до любого обращения к БД
+- [ ] CORS ограничен: `Access-Control-Allow-Origin: https://kino-app.vercel.app` (не `*`)
+
+### CI/CD
+- [ ] В каждом workflow файле: `permissions: contents: read` (минимальные права)
+- [ ] Actions закреплены по commit SHA, не по тегу
+- [ ] `npm audit --audit-level=high` добавлен как шаг перед билдом
+- [ ] Секреты не выводятся в `run:` шагах через `echo`
+
+### OWASP Top 10 — быстрая проверка
+- [ ] A01 Broken Access Control — RLS на всех таблицах, JWT в каждой Edge Function
+- [ ] A02 Cryptographic Failures — нет service_role во фронтенде, нет секретов в git
+- [ ] A03 Injection — zod валидация на всех входных данных Edge Functions
+- [ ] A05 Misconfiguration — CSP, CORS, заголовки настроены
+- [ ] A06 Vulnerable Components — `npm audit` в CI
+- [ ] A07 Auth Failures — rate limiting на OTP, токен верифицируется на бэкенде
 
 ---
 
@@ -235,13 +282,37 @@ Claude инициирует проверку сам перед первым де
 
 ---
 
+## Структура проекта
+
+```
+.github/
+  workflows/
+    automerge.yml
+    promote.yml
+    deploy.yml
+.gitignore
+.env.example
+CLAUDE.md
+README.md
+tasks/
+  todo.md
+  lessons.md
+src/
+public/
+supabase/
+kino-design-system/   — git submodule (github.com/Arsid0305/design-system)
+package.json
+```
+
+---
+
 ## Стек
 
 - React + Vite + TypeScript + Tailwind + shadcn/ui + Framer Motion
 - Supabase Auth (email OTP + анонимный), Edge Functions (Deno)
 - `ai-chat`, `movie-recommendation`
-- `xlsx` — парсинг Excel
-- `@resvg/resvg-js` — devDep, SVG → PNG для PWA-иконок
+- Design System: git submodule (`kino-design-system/`)
+- Python: нет
 
 ---
 
@@ -251,10 +322,25 @@ Claude инициирует проверку сам перед первым де
 |-----------|--------|
 | Node.js v22 | ✅ |
 | npm v10 | ✅ |
+| Python | ❌ |
 | Supabase CLI | ❌ не установлен — деплой только через GitHub Actions |
 | Deno | ❌ не установлен — Edge Functions только через CI/CD |
 | node_modules | ❌ (есть package-lock.json, `npm ci`) |
 | .env реальный | ❌ (только .env.example) |
+
+---
+
+## Стандартные пакеты
+
+> Правило: при использовании нового пакета в любом проекте — добавлять его сюда.
+
+- `lucide-react` — иконки
+- `sonner` — toast-уведомления
+- `next-themes` — смена темы (светлая/тёмная)
+- `zod` — валидация данных
+- `date-fns` — форматирование дат
+- `xlsx` — парсинг Excel-файлов
+- `@resvg/resvg-js` — SVG → PNG (devDependency, для иконок PWA)
 
 ---
 
@@ -267,7 +353,7 @@ Claude инициирует проверку сам перед первым де
 3. `automerge.yml` мержит ветку в `dev` автоматически
 4. После успешного билда — спросить пользователя: **«Мержить в main?»** и ждать ответа
 5. Никогда не мержить в `main` без явного подтверждения пользователя
-6. После мержа в `main` — деплой происходит автоматически
+6. После мержа в `main` — деплой происходит автоматически (Vercel / GitHub Actions)
 
 ---
 
