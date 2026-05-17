@@ -110,12 +110,26 @@ const Index = () => {
           cloudLibrary.watchlist.length > 0 ||
           cloudLibrary.dismissed.length > 0;
         if (hasCloudData) {
-          setWatched(cloudLibrary.watched);
-          setCustomMovies(cloudLibrary.watchlist);
-          setDismissedMovies(cloudLibrary.dismissed);
-          localStorage.setItem('cinema-watched', JSON.stringify(cloudLibrary.watched));
-          localStorage.setItem('cinema-custom-movies', JSON.stringify(cloudLibrary.watchlist));
-          localStorage.setItem('cinema-dismissed-movies', JSON.stringify(cloudLibrary.dismissed));
+          // Merge cloud + local so no data is silently lost
+          const mergedWatched = mergeUniqueMovies(cloudLibrary.watched, watchedRef.current);
+          const mergedWatchlist = mergeUniqueMovies(cloudLibrary.watchlist, customMoviesRef.current);
+          const mergedDismissed = mergeUniqueMovies(cloudLibrary.dismissed, dismissedMoviesRef.current);
+          if (cancelled) return;
+          setWatched(mergedWatched);
+          setCustomMovies(mergedWatchlist);
+          setDismissedMovies(mergedDismissed);
+          localStorage.setItem('cinema-watched', JSON.stringify(mergedWatched));
+          localStorage.setItem('cinema-custom-movies', JSON.stringify(mergedWatchlist));
+          localStorage.setItem('cinema-dismissed-movies', JSON.stringify(mergedDismissed));
+
+          // Upload any local-only items to cloud
+          const localOnlyWatched = mergedWatched.filter(m => !cloudLibrary.watched.some(c => getMovieDedupKey(c) === getMovieDedupKey(m)));
+          const localOnlyWatchlist = mergedWatchlist.filter(m => !cloudLibrary.watchlist.some(c => getMovieDedupKey(c) === getMovieDedupKey(m)));
+          const localOnlyDismissed = mergedDismissed.filter(m => !cloudLibrary.dismissed.some(c => getMovieDedupKey(c) === getMovieDedupKey(m)));
+          if (localOnlyWatched.length + localOnlyWatchlist.length + localOnlyDismissed.length > 0) {
+            await seedCloudLibrary(localOnlyWatched, localOnlyWatchlist, localOnlyDismissed);
+          }
+          if (cancelled) return;
           setSyncStatus('Синхронизировано с Supabase');
           return;
         }

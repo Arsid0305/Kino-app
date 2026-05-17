@@ -263,6 +263,7 @@ serve(async req => {
       tasteProfile?: unknown;
       watchedMovies?: unknown;
       watchlistMovies?: unknown;
+      dismissedMovies?: unknown;
     } | null;
 
     if (!body || typeof body !== "object") return jsonResponse(origin, 400, { error: "Некорректное тело запроса" });
@@ -289,6 +290,7 @@ serve(async req => {
     const tasteProfile = typeof body.tasteProfile === "string" ? body.tasteProfile.slice(0, 6000) : "";
     const watchedMovies = Array.isArray(body.watchedMovies) ? body.watchedMovies.slice(0, MAX_MOVIES) : [];
     const watchlistMovies = Array.isArray(body.watchlistMovies) ? body.watchlistMovies.slice(0, MAX_MOVIES) : [];
+    const dismissedMovies = Array.isArray(body.dismissedMovies) ? body.dismissedMovies.slice(0, MAX_MOVIES) : [];
 
     const lastUserMsg = safeMessages.filter(m => m.role === "user").at(-1)?.content ?? "";
 
@@ -327,6 +329,7 @@ serve(async req => {
 
     const watchedTitles = (watchedMovies as MovieCtx[]).map(m => m.titleRu ?? m.title ?? "").filter(Boolean).join(", ");
     const watchlistTitles = (watchlistMovies as MovieCtx[]).map(m => m.titleRu ?? m.title ?? "").filter(Boolean).join(", ");
+    const dismissedTitles = (dismissedMovies as MovieCtx[]).map(m => m.titleRu ?? m.title ?? "").filter(Boolean).join(", ");
 
     const systemPrompt = `Ты — персональный киносоветник. Отвечай на русском языке.
 Сегодняшняя дата: ${currentDate}. ${oscarNote}
@@ -345,6 +348,7 @@ ${filters.some(f => f.includes("type=")) ? `КРИТИЧНО: фильтр ти�
 
 ЗАПРЕЩЕНО рекомендовать — УЖЕ ПРОСМОТРЕНО (абсолютный запрет, ни при каких условиях): ${watchedTitles || "нет"}
 ЗАПРЕЩЕНО рекомендовать — УЖЕ В СПИСКЕ «Буду смотреть» (абсолютный запрет): ${watchlistTitles || "нет"}
+ЗАПРЕЩЕНО рекомендовать — ОТКЛОНЕНО пользователем (абсолютный запрет): ${dismissedTitles || "нет"}
 
 ВАЖНО: Всегда отвечай ТОЛЬКО валидным JSON без markdown, без \`\`\`, в следующем формате:
 {
@@ -415,11 +419,12 @@ ${filters.some(f => f.includes("type=")) ? `КРИТИЧНО: фильтр ти�
     const reply = typeof parsed.reply === "string" ? parsed.reply.trim() : raw;
     const rawSuggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
 
-    // Server-side filter: remove any suggestion that matches a watched or watchlist title
+    // Server-side filter: remove suggestions matching watched, watchlist, or dismissed titles
     const forbiddenTitleSet = new Set<string>(
       [
         ...(watchedMovies as MovieCtx[]),
         ...(watchlistMovies as MovieCtx[]),
+        ...(dismissedMovies as MovieCtx[]),
       ]
         .map(m => (m.titleRu ?? m.title ?? "").toLowerCase().trim())
         .filter(Boolean)
