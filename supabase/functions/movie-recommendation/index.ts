@@ -140,15 +140,7 @@ serve(async req => {
           },
           {
             role: "user",
-            content: `Порекомендуй РОВНО 3 фильма или сериала, похожих по духу и стилю. Все три строго отсутствуют в списке ЗАПРЕЩЁННЫХ.
-
-ЗАПРЕЩЁННЫЕ (абсолютный запрет): ${forbidden || "нет"}
-
-Фильтры: ${filters.length > 0 ? filters.join(", ") : "без ограничений"}
-Вкусовой профиль: ${tasteProfile || "пуст"}
-
-Верни ТОЛЬКО JSON-объект с массивом из 3 элементов:
-{"recommendations":[{"title":"...","titleRu":"...","year":2020,"type":"film","genres":["жанр"],"duration":100,"director":"...","description":"Синопсис","reasonToWatch":"Почему подходит","mood":["настроение"],"timeOfDay":["evening"],"format":"medium","forCompany":"any","kpRating":7.5,"country":"США","predictedRating":8.0},{"title":"...","titleRu":"...","year":2018,"type":"film","genres":["жанр"],"duration":95,"director":"...","description":"Синопсис","reasonToWatch":"Почему подходит","mood":["настроение"],"timeOfDay":["evening"],"format":"medium","forCompany":"any","kpRating":7.2,"country":"Франция","predictedRating":7.8},{"title":"...","titleRu":"...","year":2016,"type":"film","genres":["жанр"],"duration":110,"director":"...","description":"Синопсис","reasonToWatch":"Почему подходит","mood":["настроение"],"timeOfDay":["evening"],"format":"medium","forCompany":"any","kpRating":7.0,"country":"Великобритания","predictedRating":7.5}]}`,
+            content: `Порекомендуй РОВНО 3 фильма или сериала, похожих по духу и стилю. Все три строго отсутствуют в списке ЗАПРЕЩЁННЫХ.\n\nЗАПРЕЩЁННЫЕ (абсолютный запрет): ${forbidden || "нет"}\n\nФильтры: ${filters.length > 0 ? filters.join(", ") : "без ограничений"}\nВкусовой профиль: ${tasteProfile || "пуст"}\n\nВерни ТОЛЬКО JSON-объект с массивом из 3 элементов:\n{"recommendations":[{"title":"...","titleRu":"...","year":2020,"type":"film","genre":["жанр"],"duration":100,"director":"...","description":"Синопсис","reasonToWatch":"Почему подходит","mood":["настроение"],"timeOfDay":["evening"],"format":"medium","forCompany":"any","kpRating":7.5,"country":"США","predictedRating":8.0},{"title":"...","titleRu":"...","year":2018,"type":"film","genre":["жанр"],"duration":95,"director":"...","description":"Синопсис","reasonToWatch":"Почему подходит","mood":["настроение"],"timeOfDay":["evening"],"format":"medium","forCompany":"any","kpRating":7.2,"country":"Франция","predictedRating":7.8},{"title":"...","titleRu":"...","year":2016,"type":"film","genre":["жанр"],"duration":110,"director":"...","description":"Синопсис","reasonToWatch":"Почему подходит","mood":["настроение"],"timeOfDay":["evening"],"format":"medium","forCompany":"any","kpRating":7.0,"country":"Великобритания","predictedRating":7.5}]}`,
           },
         ],
         stream: false,
@@ -157,6 +149,7 @@ serve(async req => {
       });
 
       for (let attempt = 0; attempt < 3; attempt++) {
+        if (attempt > 0) await new Promise(r => setTimeout(r, 1000 * attempt));
         const res = await fetch("https://api.deepseek.com/chat/completions", {
           method: "POST",
           headers: { Authorization: `Bearer ${DEEPSEEK_API_KEY}`, "Content-Type": "application/json" },
