@@ -157,7 +157,10 @@ export const AiAdvisor = ({
     setMessages([]);
     if (cloudHistoryEnabled) {
       try {
-        await supabase.from('chat_messages').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+        const { data: userData } = await supabase.auth.getUser();
+        if (userData.user) {
+          await supabase.from('chat_messages').delete().eq('user_id', userData.user.id);
+        }
       } catch (e) {
         console.error('Failed to clear chat:', e);
       }

@@ -84,7 +84,7 @@ function toRow(movie: Movie | WatchedMovie, listType: CloudMovieListType): UserM
     movie_data: serializeMovie(movie),
     rating: 'rating' in movie ? movie.rating : null,
     notes: 'notes' in movie ? movie.notes ?? null : null,
-    watched_at: 'watchedAt' in movie ? movie.watchedAt : null,
+    watched_at: 'watchedAt' in movie ? (movie.watchedAt || null) : null,
     updated_at: new Date().toISOString(),
   };
 }

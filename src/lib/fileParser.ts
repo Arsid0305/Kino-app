@@ -69,7 +69,7 @@ function parseExcel(buffer: ArrayBuffer): ParseResult {
       if (!movie) continue;
       const rating = parseFloat(row['Моя оценка']);
       if (rating && !isNaN(rating)) {
-        watched.push({ ...movie, rating, watchedAt: '' });
+        watched.push({ ...movie, rating, watchedAt: new Date(0).toISOString() });
       }
     }
   }
@@ -96,7 +96,7 @@ function parseExcel(buffer: ArrayBuffer): ParseResult {
       if (!movie) continue;
       const rating = parseFloat(row['Моя оценка']);
       if (rating && !isNaN(rating)) {
-        watched.push({ ...movie, rating, watchedAt: '' });
+        watched.push({ ...movie, rating, watchedAt: new Date(0).toISOString() });
       } else {
         const predicted = parseFloat(row['Ожидаемая моя оценка']);
         if (predicted) movie.predictedRating = predicted;
@@ -115,7 +115,7 @@ function parseExcel(buffer: ArrayBuffer): ParseResult {
         if (!movie) continue;
         const rating = parseFloat(row['Моя оценка']);
         if (rating && !isNaN(rating)) {
-          watched.push({ ...movie, rating, watchedAt: '' });
+          watched.push({ ...movie, rating, watchedAt: new Date(0).toISOString() });
         } else {
           toWatch.push(movie);
         }
@@ -165,7 +165,7 @@ function excelRowToMovie(rawRow: Record<string, any>): (Movie & { predictedRatin
         title: titleOrig || title,
         titleRu: title,
         year,
-        type: type === 'TV_SERIES' || type === 'MINI_SERIES' ? 'series' : 'film',
+        type: type === 'TV_SERIES' ? 'series' : type === 'MINI_SERIES' ? 'miniseries' : 'film',
       },
       row['ID Кинопоиска'] || null,
     ),
@@ -182,7 +182,7 @@ function excelRowToMovie(rawRow: Record<string, any>): (Movie & { predictedRatin
     format,
     kpRating,
     country,
-    type: type === 'TV_SERIES' || type === 'MINI_SERIES' ? 'series' : 'film',
+    type: type === 'TV_SERIES' ? 'series' : type === 'MINI_SERIES' ? 'miniseries' : 'film',
   };
 }
 

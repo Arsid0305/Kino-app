@@ -17,7 +17,7 @@ function normalizeRecommendation(raw: Record<string, unknown>): Movie {
     title: String(raw.title ?? raw.titleRu ?? 'Untitled'),
     titleRu: String(raw.titleRu ?? raw.title ?? 'Untitled'),
     year: Number(raw.year ?? new Date().getFullYear()),
-    genre: Array.isArray(raw.genres) ? raw.genres.map(String) : [],
+    genre: Array.isArray(raw.genre) ? raw.genre.map(String) : Array.isArray(raw.genres) ? raw.genres.map(String) : [],
     duration,
     mood: Array.isArray(raw.mood) ? raw.mood.map(String) : ['thoughtful'],
     description: String(raw.description ?? ''),
