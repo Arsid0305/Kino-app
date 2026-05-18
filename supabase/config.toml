@@ -1,4 +1,7 @@
 project_id = "ovhwxfdtkzwxfomdlgjv"
 
-[functions.openai-chat]
-verify_jwt = false
+[functions.ai-chat]
+verify_jwt = true
+
+[functions.movie-recommendation]
+verify_jwt = true

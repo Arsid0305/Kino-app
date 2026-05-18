@@ -101,9 +101,11 @@ async function getCurrentUserId() {
 export async function removeFromCloudLists(movieKey: string, listTypes: CloudMovieListType[]) {
   if (listTypes.length === 0) return;
 
+  const userId = await getCurrentUserId();
   const { error } = await supabase
     .from('user_movies')
     .delete()
+    .eq('user_id', userId)
     .eq('movie_key', movieKey)
     .in('list_type', listTypes);
 
