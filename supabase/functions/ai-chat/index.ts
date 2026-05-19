@@ -33,7 +33,6 @@ async function callOpenAICompat(
     ...tokenParam,
     response_format: { type: "json_object" },
   };
-  // o1/o3/o4 models (useCompletionTokens=true) don't support temperature
   if (!useCompletionTokens) body.temperature = 0.7;
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
@@ -76,7 +75,6 @@ async function callGemini(
   systemPrompt: string,
   messages: ChatMessage[],
 ): Promise<string> {
-  // Gemini doesn't allow consecutive same-role messages — merge them
   const contents: { role: string; parts: { text: string }[] }[] = [];
   for (const m of messages) {
     const role = m.role === "assistant" ? "model" : "user";
@@ -95,7 +93,6 @@ async function callGemini(
     generationConfig: { maxOutputTokens: 3000, temperature: 1.0 },
   });
 
-  // Retry with exponential backoff on 503 (overloaded) — common during peak demand
   const delays = [0, 1000, 2500];
   let lastError = "";
   for (const delay of delays) {
@@ -112,10 +109,9 @@ async function callGemini(
       return parts.filter((p: { thought?: boolean }) => !p.thought).map((p: { text?: string }) => p.text ?? "").join("").trim();
     }
     lastError = `Gemini ${res.status}: ${await res.text()}`;
-    // Only retry on 503 / 429 (transient)
     if (res.status !== 503 && res.status !== 429) break;
   }
-  throw new Error(lastError || "Gemini failed after retries");
+  throw new Error(lastError || "Gemini: все попытки исчерпаны");
 }
 
 async function callProvider(
@@ -232,13 +228,13 @@ serve(async req => {
   const origin = req.headers.get("Origin");
 
   if (req.method === "OPTIONS") {
-    if (!isOriginAllowed(origin)) return jsonResponse(origin, 403, { error: "Origin is not allowed" });
+    if (!isOriginAllowed(origin)) return jsonResponse(origin, 403, { error: "Источник запрещён" });
     return new Response(null, { headers: getCorsHeaders(origin) });
   }
 
   try {
-    if (req.method !== "POST") return jsonResponse(origin, 405, { error: "Method not allowed" });
-    if (!isOriginAllowed(origin)) return jsonResponse(origin, 403, { error: "Origin is not allowed" });
+    if (req.method !== "POST") return jsonResponse(origin, 405, { error: "Метод не разрешён" });
+    if (!isOriginAllowed(origin)) return jsonResponse(origin, 403, { error: "Источник запрещён" });
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) return jsonResponse(origin, 401, { error: "Требуется авторизация" });
@@ -312,7 +308,6 @@ serve(async req => {
     }
     if (searchQuery === lastUserMsg) searchQuery = `${lastUserMsg} movie film series`;
 
-    // Gemini has built-in Google Search — skip Tavily for it
     const searchContext = provider === "gemini" ? "" : await tavilySearch(searchQuery);
 
     const now = new Date();
@@ -391,7 +386,6 @@ ${filters.some(f => f.includes("type=")) ? `КРИТИЧНО: фильтр ти�
 
     if (!raw) return jsonResponse(origin, 500, { error: "AI вернул пустой ответ" });
 
-    // Robust JSON extractor: find first syntactically complete JSON object
     function extractFirstJson(text: string): Record<string, unknown> | null {
       const s = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
       try { return JSON.parse(s) as Record<string, unknown>; } catch { /* continue */ }
@@ -419,7 +413,6 @@ ${filters.some(f => f.includes("type=")) ? `КРИТИЧНО: фильтр ти�
     const reply = typeof parsed.reply === "string" ? parsed.reply.trim() : raw;
     const rawSuggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
 
-    // Server-side filter: remove suggestions matching watched, watchlist, or dismissed titles
     const forbiddenTitleSet = new Set<string>(
       [
         ...(watchedMovies as MovieCtx[]),
@@ -441,7 +434,7 @@ ${filters.some(f => f.includes("type=")) ? `КРИТИЧНО: фильтр ти�
     return jsonResponse(origin, 200, { message: reply, suggestions });
 
   } catch (error) {
-    console.error("ai-chat error:", error);
-    return jsonResponse(origin, 500, { error: error instanceof Error ? error.message : "Unknown error" });
+    console.error("Ошибка ai-chat:", error);
+    return jsonResponse(origin, 500, { error: error instanceof Error ? error.message : "Неизвестная ошибка" });
   }
 });

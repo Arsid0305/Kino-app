@@ -82,7 +82,6 @@ const Index = () => {
     return () => data.subscription.unsubscribe();
   }, []);
 
-  // Refs to access current arrays in the session-only sync effect without re-triggering it
   const watchedRef = useRef(watched);
   watchedRef.current = watched;
   const customMoviesRef = useRef(customMovies);
@@ -110,7 +109,6 @@ const Index = () => {
           cloudLibrary.watchlist.length > 0 ||
           cloudLibrary.dismissed.length > 0;
         if (hasCloudData) {
-          // Merge cloud + local so no data is silently lost
           const mergedWatched = mergeUniqueMovies(cloudLibrary.watched, watchedRef.current);
           const mergedWatchlist = mergeUniqueMovies(cloudLibrary.watchlist, customMoviesRef.current);
           const mergedDismissed = mergeUniqueMovies(cloudLibrary.dismissed, dismissedMoviesRef.current);
@@ -122,7 +120,6 @@ const Index = () => {
           localStorage.setItem('cinema-custom-movies', JSON.stringify(mergedWatchlist));
           localStorage.setItem('cinema-dismissed-movies', JSON.stringify(mergedDismissed));
 
-          // Upload any local-only items to cloud
           const localOnlyWatched = mergedWatched.filter(m => !cloudLibrary.watched.some(c => getMovieDedupKey(c) === getMovieDedupKey(m)));
           const localOnlyWatchlist = mergedWatchlist.filter(m => !cloudLibrary.watchlist.some(c => getMovieDedupKey(c) === getMovieDedupKey(m)));
           const localOnlyDismissed = mergedDismissed.filter(m => !cloudLibrary.dismissed.some(c => getMovieDedupKey(c) === getMovieDedupKey(m)));
@@ -213,7 +210,6 @@ const Index = () => {
     const entry: WatchedMovie = { ...movie, rating, notes, watchedAt: new Date().toISOString() };
     const entryKey = getMovieDedupKey(entry);
     const updatedWatched = [entry, ...watched.filter(m => getMovieDedupKey(m) !== entryKey)];
-    // Re-rating from history does NOT remove from watchlist (user may want to rewatch again)
     const updatedDismissed = dismissedMovies.filter(m => getMovieDedupKey(m) !== entryKey);
     setWatched(updatedWatched);
     setDismissedMovies(updatedDismissed);
@@ -276,10 +272,10 @@ const Index = () => {
     if (session) {
       try {
         await upsertWatchlistMovie({ ...movie, source: movie.source ?? 'ai-chat' });
-        setSyncStatus('Watchlist синхронизирован с Supabase');
+        setSyncStatus('Список «Буду смотреть» синхронизирован с Supabase');
       } catch (error) {
         console.error(error);
-        toast.error(error instanceof Error ? error.message : 'Не удалось сохранить watchlist');
+        toast.error(error instanceof Error ? error.message : 'Не удалось сохранить список «Буду смотреть»');
       }
     }
   };
@@ -573,7 +569,6 @@ const Index = () => {
                 </button>
               </div>
 
-              {/* Movie info */}
               <div className="bg-card border border-border rounded-2xl p-5 space-y-3 cinema-glow">
                 <div>
                   <h2 className="font-display text-2xl text-foreground leading-tight">{historyPreview.titleRu}</h2>
@@ -605,7 +600,6 @@ const Index = () => {
                 </a>
               </div>
 
-              {/* Rewatch button — toggle */}
               {(() => {
                 const isRewatch = customMovies.some(m => getMovieDedupKey(m) === getMovieDedupKey(historyPreview));
                 return (
@@ -629,7 +623,6 @@ const Index = () => {
                 );
               })()}
 
-              {/* Rating form */}
               <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
                 <h3 className="font-display text-lg text-foreground">Ваша оценка</h3>
                 <div className="space-y-2">
@@ -670,15 +663,12 @@ const Index = () => {
             className="fixed inset-0 z-[70] bg-background overflow-y-auto"
           >
             <div className="max-w-md mx-auto flex flex-col min-h-full">
-
-              {/* Header */}
               <div className="flex justify-end px-4 pt-4 pb-2 shrink-0">
                 <button onClick={() => setWatchlistPreview(null)} style={{ touchAction: 'manipulation' }} className="text-muted-foreground p-1">
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              {/* Content */}
               <div className="flex-1 px-4 pb-6 flex flex-col gap-4">
                 <div className="bg-card border border-border rounded-2xl p-5 space-y-3 cinema-glow">
                   <div>
@@ -706,7 +696,6 @@ const Index = () => {
                   </div>
                 </div>
 
-                {/* Buttons */}
                 <div className="flex gap-3">
                   <a
                     href={`https://yandex.ru/search/?text=${encodeURIComponent(watchlistPreview.titleRu + ' фильм ' + watchlistPreview.year)}`}

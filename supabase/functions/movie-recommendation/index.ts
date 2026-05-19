@@ -64,13 +64,13 @@ serve(async req => {
   const origin = req.headers.get("Origin");
 
   if (req.method === "OPTIONS") {
-    if (!isOriginAllowed(origin)) return jsonResponse(origin, 403, { error: "Origin is not allowed" });
+    if (!isOriginAllowed(origin)) return jsonResponse(origin, 403, { error: "Источник запрещён" });
     return new Response(null, { headers: getCorsHeaders(origin) });
   }
 
   try {
-    if (req.method !== "POST") return jsonResponse(origin, 405, { error: "Method not allowed" });
-    if (!isOriginAllowed(origin)) return jsonResponse(origin, 403, { error: "Origin is not allowed" });
+    if (req.method !== "POST") return jsonResponse(origin, 405, { error: "Метод не разрешён" });
+    if (!isOriginAllowed(origin)) return jsonResponse(origin, 403, { error: "Источник запрещён" });
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) return jsonResponse(origin, 401, { error: "Требуется авторизация" });
@@ -108,14 +108,13 @@ serve(async req => {
       ? body.dismissedMovies.filter(isMovieContext).slice(0, MAX_MOVIES) : [];
 
     const DEEPSEEK_API_KEY = Deno.env.get("DEEPSEEK_API_KEY");
-    if (!DEEPSEEK_API_KEY) throw new Error("DEEPSEEK_API_KEY is not configured");
+    if (!DEEPSEEK_API_KEY) throw new Error("DEEPSEEK_API_KEY не настроен");
     const DEEPSEEK_MODEL = Deno.env.get("DEEPSEEK_MODEL") ?? DEFAULT_DEEPSEEK_MODEL;
 
     const watchedTitles = titlesOf(watchedMovies.slice(0, 40));
     const watchlistTitles = titlesOf(watchlistMovies.slice(0, 40));
     const dismissedTitles = titlesOf(dismissedMovies.slice(0, 40));
 
-    // Build a title-based forbidden set for server-side filtering
     const forbiddenTitleSet = new Set<string>(
       [
         ...(watchedMovies as MovieCtx[]),
@@ -172,19 +171,18 @@ serve(async req => {
             : [parsed];
           return arr;
         } catch {
-          if (attempt === 2) throw new Error(`JSON parse failed: ${clean.slice(0, 100)}`);
+          if (attempt === 2) throw new Error(`Ошибка разбора JSON: ${clean.slice(0, 100)}`);
         }
       }
-      throw new Error("callForTwo exhausted retries");
+      throw new Error("Все попытки запроса исчерпаны");
     };
 
     const rawResults = await callForTwo();
-    // Filter forbidden, then take up to 2 (we asked for 3 as buffer)
     const picked = rawResults.filter(movie => {
       const titleRu = typeof movie.titleRu === "string" ? movie.titleRu.toLowerCase().trim() : "";
       const title = typeof movie.title === "string" ? movie.title.toLowerCase().trim() : "";
       const allowed = !forbiddenTitleSet.has(titleRu) && !forbiddenTitleSet.has(title);
-      if (!allowed) console.log(`Filtered out forbidden: ${movie.titleRu ?? movie.title}`);
+      if (!allowed) console.log(`Отфильтровано (запрещено): ${movie.titleRu ?? movie.title}`);
       return allowed;
     }).slice(0, 2);
 
@@ -193,7 +191,7 @@ serve(async req => {
     return jsonResponse(origin, 200, { recommendations: picked });
 
   } catch (error) {
-    console.error("movie-recommendation error:", error);
-    return jsonResponse(origin, 500, { error: error instanceof Error ? error.message : "Unknown error" });
+    console.error("Ошибка movie-recommendation:", error);
+    return jsonResponse(origin, 500, { error: error instanceof Error ? error.message : "Неизвестная ошибка" });
   }
 });
