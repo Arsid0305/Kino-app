@@ -42,8 +42,8 @@ export function hydrateMovie(row: UserMovieRow): Movie | WatchedMovie {
   const movie = row.movie_data as Record<string, unknown>;
   const baseMovie: Movie = {
     id: String(movie.id ?? row.movie_key),
-    title: String(movie.title ?? movie.titleRu ?? 'Untitled'),
-    titleRu: String(movie.titleRu ?? movie.title ?? 'Untitled'),
+    title: String(movie.title ?? movie.titleRu ?? 'Без названия'),
+    titleRu: String(movie.titleRu ?? movie.title ?? 'Без названия'),
     year: Number(movie.year ?? 0),
     genre: Array.isArray(movie.genre) ? movie.genre.map(String) : [],
     duration: Number(movie.duration ?? 0),

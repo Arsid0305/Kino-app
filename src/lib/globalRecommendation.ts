@@ -14,8 +14,8 @@ function normalizeRecommendation(raw: Record<string, unknown>): Movie {
 
   return {
     id: `ai-global:${String(raw.kpQuery ?? raw.titleRu ?? raw.title ?? crypto.randomUUID())}`,
-    title: String(raw.title ?? raw.titleRu ?? 'Untitled'),
-    titleRu: String(raw.titleRu ?? raw.title ?? 'Untitled'),
+    title: String(raw.title ?? raw.titleRu ?? 'Без названия'),
+    titleRu: String(raw.titleRu ?? raw.title ?? 'Без названия'),
     year: Number(raw.year ?? new Date().getFullYear()),
     genre: Array.isArray(raw.genre) ? raw.genre.map(String) : Array.isArray(raw.genres) ? raw.genres.map(String) : [],
     duration,

@@ -99,8 +99,8 @@ function normalizeSuggestions(movies: Movie[] | undefined): Movie[] {
   return (movies ?? []).map((movie, index) => ({
     ...movie,
     id: movie.id || `chat:${crypto.randomUUID()}:${index}`,
-    title: movie.title || movie.titleRu || 'Untitled',
-    titleRu: movie.titleRu || movie.title || 'Untitled',
+    title: movie.title || movie.titleRu || 'Без названия',
+    titleRu: movie.titleRu || movie.title || 'Без названия',
     genre: movie.genre ?? [],
     mood: movie.mood ?? [],
     timeOfDay: movie.timeOfDay ?? ['evening'],
@@ -162,7 +162,7 @@ export const AiAdvisor = ({
           await supabase.from('chat_messages').delete().eq('user_id', userData.user.id);
         }
       } catch (e) {
-        console.error('Failed to clear chat:', e);
+        console.error('Не удалось очистить чат:', e);
       }
     }
   };
@@ -231,7 +231,7 @@ export const AiAdvisor = ({
 
     try {
       const accessToken = await getAccessToken();
-      await persistMessage(userMessage).catch(e => console.error('Failed to persist user message:', e));
+      await persistMessage(userMessage).catch(e => console.error('Не удалось сохранить сообщение пользователя:', e));
 
       const resp = await fetch(CHAT_URL, {
         method: 'POST',
@@ -257,7 +257,7 @@ export const AiAdvisor = ({
         suggestions: normalizeSuggestions(payload.suggestions),
       };
       setMessages(prev => [...prev, assistantMessage]);
-      await persistMessage(assistantMessage).catch(e => console.error('Failed to persist assistant message:', e));
+      await persistMessage(assistantMessage).catch(e => console.error('Не удалось сохранить сообщение ассистента:', e));
     } catch (error) {
       setMessages(prev => [...prev, {
         id: `local-error:${crypto.randomUUID()}`,
