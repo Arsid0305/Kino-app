@@ -64,13 +64,13 @@ serve(async req => {
   const origin = req.headers.get("Origin");
 
   if (req.method === "OPTIONS") {
-    if (!isOriginAllowed(origin)) return jsonResponse(origin, 403, { error: "Origin is not allowed" });
+    if (!isOriginAllowed(origin)) return jsonResponse(origin, 403, { error: "Источник запрещён" });
     return new Response(null, { headers: getCorsHeaders(origin) });
   }
 
   try {
-    if (req.method !== "POST") return jsonResponse(origin, 405, { error: "Method not allowed" });
-    if (!isOriginAllowed(origin)) return jsonResponse(origin, 403, { error: "Origin is not allowed" });
+    if (req.method !== "POST") return jsonResponse(origin, 405, { error: "Метод не разрешён" });
+    if (!isOriginAllowed(origin)) return jsonResponse(origin, 403, { error: "Источник запрещён" });
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) return jsonResponse(origin, 401, { error: "Требуется авторизация" });
@@ -108,14 +108,13 @@ serve(async req => {
       ? body.dismissedMovies.filter(isMovieContext).slice(0, MAX_MOVIES) : [];
 
     const DEEPSEEK_API_KEY = Deno.env.get("DEEPSEEK_API_KEY");
-    if (!DEEPSEEK_API_KEY) throw new Error("DEEPSEEK_API_KEY is not configured");
+    if (!DEEPSEEK_API_KEY) throw new Error("DEEPSEEK_API_KEY не настроен");
     const DEEPSEEK_MODEL = Deno.env.get("DEEPSEEK_MODEL") ?? DEFAULT_DEEPSEEK_MODEL;
 
     const watchedTitles = titlesOf(watchedMovies.slice(0, 40));
     const watchlistTitles = titlesOf(watchlistMovies.slice(0, 40));
     const dismissedTitles = titlesOf(dismissedMovies.slice(0, 40));
 
-    // Build a title-based forbidden set for server-side filtering
     const forbiddenTitleSet = new Set<string>(
       [
         ...(watchedMovies as MovieCtx[]),
@@ -140,15 +139,7 @@ serve(async req => {
           },
           {
             role: "user",
-            content: `Порекомендуй РОВНО 3 фильма или сериала, похожих по духу и стилю. Все три строго отсутствуют в списке ЗАПРЕЩЁННЫХ.
-
-ЗАПРЕЩЁННЫЕ (абсолютный запрет): ${forbidden || "нет"}
-
-Фильтры: ${filters.length > 0 ? filters.join(", ") : "без ограничений"}
-Вкусовой профиль: ${tasteProfile || "пуст"}
-
-Верни ТОЛЬКО JSON-объект с массивом из 3 элементов:
-{"recommendations":[{"title":"...","titleRu":"...","year":2020,"type":"film","genres":["жанр"],"duration":100,"director":"...","description":"Синопсис","reasonToWatch":"Почему подходит","mood":["настроение"],"timeOfDay":["evening"],"format":"medium","forCompany":"any","kpRating":7.5,"country":"США","predictedRating":8.0},{"title":"...","titleRu":"...","year":2018,"type":"film","genres":["жанр"],"duration":95,"director":"...","description":"Синопсис","reasonToWatch":"Почему подходит","mood":["настроение"],"timeOfDay":["evening"],"format":"medium","forCompany":"any","kpRating":7.2,"country":"Франция","predictedRating":7.8},{"title":"...","titleRu":"...","year":2016,"type":"film","genres":["жанр"],"duration":110,"director":"...","description":"Синопсис","reasonToWatch":"Почему подходит","mood":["настроение"],"timeOfDay":["evening"],"format":"medium","forCompany":"any","kpRating":7.0,"country":"Великобритания","predictedRating":7.5}]}`,
+            content: `Порекомендуй РОВНО 3 фильма или сериала, похожих по духу и стилю. Все три строго отсутствуют в списке ЗАПРЕЩЁННЫХ.\n\nЗАПРЕЩЁННЫЕ (абсолютный запрет): ${forbidden || "нет"}\n\nФильтры: ${filters.length > 0 ? filters.join(", ") : "без ограничений"}\nВкусовой профиль: ${tasteProfile || "пуст"}\n\nВерни ТОЛЬКО JSON-объект с массивом из 3 элементов:\n{"recommendations":[{"title":"...","titleRu":"...","year":2020,"type":"film","genre":["жанр"],"duration":100,"director":"...","description":"Синопсис","reasonToWatch":"Почему подходит","mood":["настроение"],"timeOfDay":["evening"],"format":"medium","forCompany":"any","kpRating":7.5,"country":"США","predictedRating":8.0},{"title":"...","titleRu":"...","year":2018,"type":"film","genre":["жанр"],"duration":95,"director":"...","description":"Синопсис","reasonToWatch":"Почему подходит","mood":["настроение"],"timeOfDay":["evening"],"format":"medium","forCompany":"any","kpRating":7.2,"country":"Франция","predictedRating":7.8},{"title":"...","titleRu":"...","year":2016,"type":"film","genre":["жанр"],"duration":110,"director":"...","description":"Синопсис","reasonToWatch":"Почему подходит","mood":["настроение"],"timeOfDay":["evening"],"format":"medium","forCompany":"any","kpRating":7.0,"country":"Великобритания","predictedRating":7.5}]}`,
           },
         ],
         stream: false,
@@ -157,6 +148,7 @@ serve(async req => {
       });
 
       for (let attempt = 0; attempt < 3; attempt++) {
+        if (attempt > 0) await new Promise(r => setTimeout(r, 1000 * attempt));
         const res = await fetch("https://api.deepseek.com/chat/completions", {
           method: "POST",
           headers: { Authorization: `Bearer ${DEEPSEEK_API_KEY}`, "Content-Type": "application/json" },
@@ -179,19 +171,18 @@ serve(async req => {
             : [parsed];
           return arr;
         } catch {
-          if (attempt === 2) throw new Error(`JSON parse failed: ${clean.slice(0, 100)}`);
+          if (attempt === 2) throw new Error(`Ошибка разбора JSON: ${clean.slice(0, 100)}`);
         }
       }
-      throw new Error("callForTwo exhausted retries");
+      throw new Error("Все попытки запроса исчерпаны");
     };
 
     const rawResults = await callForTwo();
-    // Filter forbidden, then take up to 2 (we asked for 3 as buffer)
     const picked = rawResults.filter(movie => {
       const titleRu = typeof movie.titleRu === "string" ? movie.titleRu.toLowerCase().trim() : "";
       const title = typeof movie.title === "string" ? movie.title.toLowerCase().trim() : "";
       const allowed = !forbiddenTitleSet.has(titleRu) && !forbiddenTitleSet.has(title);
-      if (!allowed) console.log(`Filtered out forbidden: ${movie.titleRu ?? movie.title}`);
+      if (!allowed) console.log(`Отфильтровано (запрещено): ${movie.titleRu ?? movie.title}`);
       return allowed;
     }).slice(0, 2);
 
@@ -200,7 +191,7 @@ serve(async req => {
     return jsonResponse(origin, 200, { recommendations: picked });
 
   } catch (error) {
-    console.error("movie-recommendation error:", error);
-    return jsonResponse(origin, 500, { error: error instanceof Error ? error.message : "Unknown error" });
+    console.error("Ошибка movie-recommendation:", error);
+    return jsonResponse(origin, 500, { error: error instanceof Error ? error.message : "Неизвестная ошибка" });
   }
 });

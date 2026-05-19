@@ -99,24 +99,24 @@ export const AuthPanel = ({ session, syncStatus, onSendOtp, onVerifyOtp, onSignO
       ) : (
         <>
           <p className="text-xs text-muted-foreground">
-            Введите 8-значный код из письма на <span className="text-foreground">{email}</span>
+            Введите 6-значный код из письма на <span className="text-foreground">{email}</span>
           </p>
           <div className="flex gap-2">
             <input
               value={code}
-              onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 8))}
+              onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
               onKeyDown={e => { if (e.key === 'Enter') void handleVerify(); }}
-              placeholder="00000000"
+              placeholder="000000"
               inputMode="numeric"
-              maxLength={8}
+              maxLength={6}
               className="flex-1 rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary tracking-widest text-center"
             />
             <button
               onClick={() => void handleVerify()}
-              disabled={submitting || code.length < 8}
+              disabled={submitting || code.length < 6}
               className="px-4 rounded-xl bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50"
             >
-              {submitting ? '...' : 'OK'}
+              {submitting ? '...' : 'ОК'}
             </button>
           </div>
           <button

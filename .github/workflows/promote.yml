@@ -19,8 +19,8 @@ jobs:
           node-version: 22
           cache: 'npm'
 
-      - name: Install & build
-        run: npm ci && npm run build
+      - name: Install, test & build
+        run: npm ci && npm test && npm run build
 
       - name: Merge dev into main
         run: |

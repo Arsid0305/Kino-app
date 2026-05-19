@@ -42,8 +42,8 @@ export function hydrateMovie(row: UserMovieRow): Movie | WatchedMovie {
   const movie = row.movie_data as Record<string, unknown>;
   const baseMovie: Movie = {
     id: String(movie.id ?? row.movie_key),
-    title: String(movie.title ?? movie.titleRu ?? 'Untitled'),
-    titleRu: String(movie.titleRu ?? movie.title ?? 'Untitled'),
+    title: String(movie.title ?? movie.titleRu ?? 'Без названия'),
+    titleRu: String(movie.titleRu ?? movie.title ?? 'Без названия'),
     year: Number(movie.year ?? 0),
     genre: Array.isArray(movie.genre) ? movie.genre.map(String) : [],
     duration: Number(movie.duration ?? 0),
@@ -84,7 +84,7 @@ function toRow(movie: Movie | WatchedMovie, listType: CloudMovieListType): UserM
     movie_data: serializeMovie(movie),
     rating: 'rating' in movie ? movie.rating : null,
     notes: 'notes' in movie ? movie.notes ?? null : null,
-    watched_at: 'watchedAt' in movie ? movie.watchedAt : null,
+    watched_at: 'watchedAt' in movie ? (movie.watchedAt || null) : null,
     updated_at: new Date().toISOString(),
   };
 }
@@ -101,9 +101,11 @@ async function getCurrentUserId() {
 export async function removeFromCloudLists(movieKey: string, listTypes: CloudMovieListType[]) {
   if (listTypes.length === 0) return;
 
+  const userId = await getCurrentUserId();
   const { error } = await supabase
     .from('user_movies')
     .delete()
+    .eq('user_id', userId)
     .eq('movie_key', movieKey)
     .in('list_type', listTypes);
 

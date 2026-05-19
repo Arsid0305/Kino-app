@@ -69,7 +69,7 @@ function parseExcel(buffer: ArrayBuffer): ParseResult {
       if (!movie) continue;
       const rating = parseFloat(row['Моя оценка']);
       if (rating && !isNaN(rating)) {
-        watched.push({ ...movie, rating, watchedAt: '' });
+        watched.push({ ...movie, rating, watchedAt: new Date(0).toISOString() });
       }
     }
   }
@@ -96,7 +96,7 @@ function parseExcel(buffer: ArrayBuffer): ParseResult {
       if (!movie) continue;
       const rating = parseFloat(row['Моя оценка']);
       if (rating && !isNaN(rating)) {
-        watched.push({ ...movie, rating, watchedAt: '' });
+        watched.push({ ...movie, rating, watchedAt: new Date(0).toISOString() });
       } else {
         const predicted = parseFloat(row['Ожидаемая моя оценка']);
         if (predicted) movie.predictedRating = predicted;
@@ -115,7 +115,7 @@ function parseExcel(buffer: ArrayBuffer): ParseResult {
         if (!movie) continue;
         const rating = parseFloat(row['Моя оценка']);
         if (rating && !isNaN(rating)) {
-          watched.push({ ...movie, rating, watchedAt: '' });
+          watched.push({ ...movie, rating, watchedAt: new Date(0).toISOString() });
         } else {
           toWatch.push(movie);
         }
@@ -165,7 +165,7 @@ function excelRowToMovie(rawRow: Record<string, any>): (Movie & { predictedRatin
         title: titleOrig || title,
         titleRu: title,
         year,
-        type: type === 'TV_SERIES' || type === 'MINI_SERIES' ? 'series' : 'film',
+        type: type === 'TV_SERIES' ? 'series' : type === 'MINI_SERIES' ? 'miniseries' : 'film',
       },
       row['ID Кинопоиска'] || null,
     ),
@@ -182,7 +182,7 @@ function excelRowToMovie(rawRow: Record<string, any>): (Movie & { predictedRatin
     format,
     kpRating,
     country,
-    type: type === 'TV_SERIES' || type === 'MINI_SERIES' ? 'series' : 'film',
+    type: type === 'TV_SERIES' ? 'series' : type === 'MINI_SERIES' ? 'miniseries' : 'film',
   };
 }
 
@@ -273,10 +273,15 @@ function parseCSVLine(line: string): string[] {
   const result: string[] = [];
   let current = '';
   let inQuotes = false;
-  for (const char of line) {
-    if (char === '"') { inQuotes = !inQuotes; continue; }
-    if (char === ',' && !inQuotes) { result.push(current); current = ''; continue; }
-    current += char;
+  let i = 0;
+  while (i < line.length) {
+    const char = line[i];
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') { current += '"'; i += 2; continue; }
+      inQuotes = !inQuotes; i++; continue;
+    }
+    if (char === ',' && !inQuotes) { result.push(current); current = ''; i++; continue; }
+    current += char; i++;
   }
   result.push(current);
   return result;
