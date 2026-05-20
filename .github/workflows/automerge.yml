@@ -2,9 +2,8 @@ name: Auto-merge feature branches
 
 on:
   push:
-    branches-ignore:
-      - main
-      - dev
+    branches:
+      - claude/**
 
 jobs:
   automerge-to-dev:
@@ -21,5 +20,9 @@ jobs:
           git config user.name "GitHub Actions"
           git fetch origin dev
           git checkout dev
-          git merge --no-ff ${{ github.ref_name }} -m "Auto-merge ${{ github.ref_name }} into dev"
+          if ! git merge --no-ff ${{ github.ref_name }} -m "Auto-merge ${{ github.ref_name }} into dev"; then
+            echo "Merge conflict detected — aborting"
+            git merge --abort
+            exit 1
+          fi
           git push origin dev
