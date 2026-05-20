@@ -3,25 +3,35 @@ name: Auto-merge feature branches
 on:
   push:
     branches:
-      - claude/**
+      - "claude/**"
+      - "cursor/**"
+
+concurrency:
+  group: automerge-to-main
+  cancel-in-progress: false
 
 jobs:
   automerge-to-main:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Merge into main
+        env:
+          BRANCH_NAME: ${{ github.ref_name }}
         run: |
           git config user.email "actions@github.com"
           git config user.name "GitHub Actions"
-          git fetch origin main
           git checkout main
-          if ! git merge --no-ff ${{ github.ref_name }} -m "Auto-merge ${{ github.ref_name }} into main"; then
-            echo "Merge conflict detected — aborting"
+          git fetch origin "$BRANCH_NAME"
+          if ! git merge --no-ff "$BRANCH_NAME" -m "Auto-merge $BRANCH_NAME into main"; then
+            echo "ERROR: Merge conflict detected. Aborting." >&2
             git merge --abort
             exit 1
           fi
