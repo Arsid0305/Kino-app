@@ -21,17 +21,17 @@ if "claude/**" not in automerge:
 if "cursor/**" not in automerge:
     fail("automerge.yml: missing 'cursor/**' in branches filter")
 
-# 2. automerge.yml: merges into dev, not main (two-stage workflow is intentional)
-if "checkout dev" not in automerge and "origin dev" not in automerge:
-    fail("automerge.yml: must merge into 'dev', not 'main' (two-stage: claude/** → dev → main via promote.yml)")
-
-# 3. No -X theirs in automerge.yml
+# 2. No -X theirs in automerge.yml (unsafe merge strategy)
 if "-X theirs" in automerge:
     fail("automerge.yml: contains '-X theirs' — unsafe merge strategy, remove it")
 
-# 4. promote.yml must exist (mandatory for two-stage workflow)
+# 3. automerge.yml: merges into main (direct workflow, no dev stage)
+if "checkout main" not in automerge and "origin main" not in automerge:
+    fail("automerge.yml: must merge into 'main' (workflow: claude/... → main directly)")
+
+# 4. promote.yml must exist
 if not Path(".github/workflows/promote.yml").exists():
-    fail(".github/workflows/promote.yml: missing — required for two-stage workflow (dev → main with tests)")
+    fail(".github/workflows/promote.yml: missing — required for post-merge test runs")
 
 if errors:
     print("CONSISTENCY ERRORS:")
