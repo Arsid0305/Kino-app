@@ -1,7 +1,6 @@
 # Repository Audit — Reference Prompt
 
 Вставить этот файл целиком в начало аудита любому AI.  
-Перед запуском — адаптировать блок «Контекст проекта» под реальный стек.
 
 ---
 
@@ -19,33 +18,37 @@
 ## Контекст проекта
 
 ```
-Тип проекта: мета-шаблон — база для создания новых проектов через init.sh
-Стек: Bash (init.sh), Python (scripts/check_consistency.py), YAML (automerge.yml), Markdown
-Главный язык: Markdown / Bash / Python
-Внешние API: нет
+Тип проекта: веб-приложение для рекомендации фильмов с AI-советником
+Стек: React + Vite + TypeScript + Tailwind + shadcn/ui + Framer Motion
+Бэкенд: Supabase Auth (email OTP + анонимный) + Edge Functions (Deno)
+Edge Functions: ai-chat, movie-recommendation
+Деплой: Vercel (фронтенд, main) + GitHub Actions (Edge Functions)
+Тесты: Vitest (npm test)
+Design System: git submodule kino-design-system/ (github.com/Arsid0305/design-system)
 
-CI/CD: automerge.yml (claude/** и cursor/** → main)
-После push: check_consistency.py → merge в main
+CI/CD:
+  automerge.yml — claude/** и cursor/** → main автоматически, conflict guard
+  promote.yml   — тесты перед деплоем
+  deploy.yml    — Edge Functions при изменении supabase/functions/**
 
 SSOT этого проекта:
-  git workflow     → .github/workflows/automerge.yml (allowlist, conflict guard, CI steps)
-  правила AI-инструментов → adapters/CLAUDE.md, adapters/CURSOR.md, adapters/OPENAI.md
+  git workflow          → .github/workflows/automerge.yml
+  логика рекомендаций    → src/lib/movieEngine.ts
+  типы фильмов        → src/lib/movieTypes.ts
+  Edge Functions        → supabase/functions/
+  правила AI-работы       → CLAUDE.md
 
 Вторичные источники (должны совпадать с SSOT):
-  SYSTEM.md §5      → должен совпадать с automerge.yml (ветки, нет dev)
-  QUICKSTART.md    → таблица Git flow должна отражать claude/... → main
-  adapters/*.md    → секция Git Workflow должна совпадать с automerge.yml
-  scripts/check_consistency.py → должен проверять все эти соответствия
+  CLAUDE.md §Инфраструктура  → должен совпадать с automerge.yml
+  CLAUDE.md §Рабочий процесс → должен отражать реальную схему ветвления
+  Edge Functions        → должны соответствовать типам из movieTypes.ts
 ```
 
-**НЕ проверять** (нерелевантно для мета-шаблона):
-- multi-user изоляция и RBAC
-- rate limiting и abuse prevention
+**НЕ проверять** (нерелевантно для персонального проекта):
+- multi-user RBAC и изоляция тенантов
 - GDPR / compliance
 - Docker / Kubernetes / horizontal scaling
-- §2 ВНЕШНИЕ API — нет внешних API
-- §9 НАБЛЮДАЕМОСТЬ — нет runtime
-- §10 ЗАВИСИМОСТИ — только Python stdlib
+- §10 ЗАВИСИМОСТИ — frontend-зависимости вынесены за скопапростого аудита
 
 ---
 
@@ -57,7 +60,7 @@ SSOT этого проекта:
 |------|--------|-------|
 | 1 — Корректность | §1, §3, §8 | SSOT sync, чистота слоёв, обработка ошибок |
 | 2 — Безопасность + документация | §6, §7, §5, §5.1, §5.2 | security, dead code, docs vs reality |
-| 3 — CI + архитектура | §4, §11, §12 | CI/CD, дизайн, freshness |
+| 3 — CI + архитектура | §4, §9, §11, §12 | CI/CD, производительность, freshness |
 
 Каждый pass — свой мини-отчёт в формате §«Формат отчёта».
 
@@ -67,95 +70,98 @@ SSOT этого проекта:
 
 ### 1. СИНХРОНИЗАЦИЯ (SSOT → вторичные источники)
 
-Определить SSOT проекта (из блока «Контекст») и проверить что все вторичные источники ему соответствуют:
-
-- [ ] `automerge.yml` совпадает с `SYSTEM.md §5`, `QUICKSTART.md` и секциями Git Workflow всех адаптеров
-- [ ] `scripts/check_consistency.py` проверяет все эти соответствия автоматически
-- [ ] Добавление нового AI-инструмента требует правки только в `adapters/` и `init.sh` — не в SYSTEM.md или QUICKSTART.md вручную
-- [ ] `init.sh` копирует все файлы которые реально существуют в репо
+- [ ] `automerge.yml` совпадает с описанием в `CLAUDE.md §Инфраструктура`
+- [ ] `CLAUDE.md §Рабочий процесс` отражает реальную схему `claude/... → main`
+- [ ] Типы фильмов в Edge Functions соответствуют типам из `src/lib/movieTypes.ts`
+- [ ] Логика `ai-chat` и `movie-recommendation` соответствует что декларирует `movieEngine.ts`
 
 ### 2. ВНЕШНИЕ API И КЛИЕНТЫ
 
-_Не применимо — внешних API нет._
+- [ ] `VITE_SUPABASE_URL` и `VITE_SUPABASE_ANON_KEY` — единственные публичные ключи во фронтенде
+- [ ] AI-ключи (ANTHROPIC, OPENAI, GOOGLE, DEEPSEEK) — только в Supabase Secrets, не в фронтенде
+- [ ] Rate limiting на AI Edge Functions — есть или нет (зафиксировать статус)
+- [ ] CORS ограничен: `https://kino-app.vercel.app`, не `*`
 
 ### 3. ЧИСТОТА СЛОЁВ
 
-- [ ] `init.sh` выполняет только копирование — нет логики проекта внутри
-- [ ] `check_consistency.py` не делает ничего кроме проверок
-- [ ] Каждый адаптер описывает только СВОЙ инструмент
+- [ ] `movieEngine.ts` содержит только логику, не UI
+- [ ] `movieTypes.ts` содержит только типы, не логику
+- [ ] Edge Functions не содержат бизнес-логику фронтенда
+- [ ] Компоненты React не содержат прямых обращений к Supabase — через хуки/сервисы
 
 ### 4. CI/CD
 
 - [ ] `automerge.yml` триггер ограничен `claude/**` и `cursor/**`
-- [ ] `check_consistency.py` запускается в CI до merge
+- [ ] `promote.yml` запускает `npm ci && npm test && npm run build` перед мержем
+- [ ] `deploy.yml` триггерится только на `supabase/functions/**`
 - [ ] При конфликте мержа — abort + exit 1, не зависает
 - [ ] Нет `--no-verify`, нет force push в main
+- [ ] Actions закреплены по commit SHA, не по тегу
 
 ### 5. ДОКУМЕНТАЦИЯ vs РЕАЛЬНОСТЬ
 
 **Сканировать ВСЕ `.md` файлы:**
 ```
-find . -name '*.md' -not -path './.git/*' -not -path '*/archive/*'
+find . -name '*.md' -not -path './.git/*' -not -path '*/kino-design-system/*'
 ```
 
-- [ ] `QUICKSTART.md` git flow содержит `claude/... → main` (не `dev`)
-- [ ] `SYSTEM.md §5` содержит `git pull origin main` и не упоминает `dev`
-- [ ] `adapters/CLAUDE.md` и `adapters/CURSOR.md` — Git Workflow совпадает с `automerge.yml`
-- [ ] `NEW_PROJECT.md` заполнен — нет плейсхолдеров `[...]`
-- [ ] Все пути в .md реально существуют
+- [ ] `CLAUDE.md §Инфраструктура` — описание workflow совпадает с `automerge.yml`
+- [ ] `CLAUDE.md §Среда Claude` — статусы инструментов актуальны
+- [ ] Все пути в `.md` реально существуют в репо
+- [ ] `README.md` — есть, не пустой
 
-#### 5.1 ПЕРЕКРЁСТНАЯ СОГЛАСОВАННОСТЬ АДАПТЕРОВ
-
-Адаптеры: `adapters/CLAUDE.md`, `adapters/CURSOR.md`, `adapters/OPENAI.md`
-
-- [ ] Каждый адаптер описывает только СВОЙ инструмент
-- [ ] Git workflow единообразен во всех адаптерах и в `automerge.yml`
-- [ ] `adapters/OPENAI.md` помечает что git-доступа нет — код применяется вручную
-- [ ] `init.sh` копирует все три адаптера корректно
-
-#### 5.2 ГЛОБАЛЬНАЯ ПЕРЕКРЁСТНАЯ СВЕРКА
+#### 5.1 ПЕРЕКРЁСТНАЯ СВЕРКА
 
 | Что сверять | Источник (SSOT) | Вторичные |
 |---|---|---|
-| Git workflow | `automerge.yml` | `SYSTEM.md §5`, `QUICKSTART.md`, `adapters/*.md` |
-| Список адаптеров | `adapters/` папка | `init.sh`, `QUICKSTART.md` таблица |
-| Список файлов копируемых | `init.sh` | `QUICKSTART.md` «Структура после init.sh» |
+| Git workflow | `automerge.yml` | `CLAUDE.md §Инфраструктура`, `CLAUDE.md §Рабочий процесс` |
+| Типы данных | `movieTypes.ts` | Edge Functions, `movieEngine.ts` |
+| UI-компоненты | `kino-design-system/` | `src/components/` |
 
 - [ ] Git workflow одинаков во всех источниках
-- [ ] Список адаптеров в `init.sh` совпадает с `adapters/` и `QUICKSTART.md`
-- [ ] Структура после `init.sh` в `QUICKSTART.md` совпадает с тем что реально копируется
+- [ ] Типы в Edge Functions импортируются из `movieTypes.ts`, не дублируются
+- [ ] UI использует токены из design system, не хардкод цвета/отступы
 
 ### 6. БЕЗОПАСНОСТЬ
 
-- [ ] Нет секретов в файлах репо
-- [ ] `init.sh` не использует `shell=True` / `eval` / подставку переменных в shell без валидации
-- [ ] Опасные пути в `TARGET` блокируются (`/`, `/etc` и т.д.)
+- [ ] Нет `service_role` ключа в `VITE_` переменных
+- [ ] `.env` не попал в историю git: `git log --all -- .env`
+- [ ] Каждая Edge Function верифицирует JWT: `supabase.auth.getUser(token)` → 401
+- [ ] `user_id` берётся только из верифицированного токена, не из тела запроса
+- [ ] Входные данные валидируются через `zod` до обращения к БД
+- [ ] RLS включён на каждой таблице в `public` схеме, политики через `auth.uid()`
+- [ ] `vite.config.ts` — нет `build.sourcemap: true`
+- [ ] Секреты не выводятся в `run:` шагах CI через `echo`
 
 ### 7. МЁРТВЫЙ КОД
 
-- [ ] Все файлы перечисленные в `QUICKSTART.md` «Структура после init.sh» реально копируются `init.sh`
-- [ ] Нет файлов в `adapters/` или `scripts/` упомянутых в .md но не существующих
+- [ ] Нет неиспользуемых Edge Functions в `supabase/functions/`
+- [ ] Нет типов в `movieTypes.ts` которые не используются нигде
 - [ ] Нет устаревших workflow файлов в `.github/workflows/`
+- [ ] Нет компонентов в `src/` которые не импортируются нигде
 
 ### 8. ОБРАБОТКА ОШИБОК
 
-- [ ] `init.sh` прерывается с понятным сообщением при ошибке (`set -euo pipefail`)
-- [ ] `check_consistency.py` выходит `exit 1` с перечнем всех ошибок, не только первой
+- [ ] Edge Functions возвращают понятный HTTP-код при ошибке, не только 500
+- [ ] Ошибки в `movieEngine.ts` обрабатываются, не падают скрытно
+- [ ] Frontend отображает ошибки AI/сети пользователю (toast/fallback), не остаётся висеть
 - [ ] `automerge.yml` abort при конфликте, не зависает
 
 ### 9. НАБЛЮДАЕМОСТЬ
 
-_Не применимо — нет runtime._
+- [ ] Ошибки Edge Functions логируются в Supabase Logs
+- [ ] Frontend-ошибки не содержат секретов в `console.log`
+- [ ] Vercel превью работает на `claude/**` ветках
 
 ### 10. ЗАВИСИМОСТИ
 
-_Не применимо — только Python stdlib._
+_Не входит в скоп простого аудита._
 
 ### 11. АРХИТЕКТУРНЫЙ СМЫСЛ
 
 - [ ] Что можно удалить без потери функциональности
-- [ ] Добавление нового адаптера: сколько мест трогать? (`adapters/`, `init.sh`, `QUICKSTART.md`) — это норма
-- [ ] `check_consistency.py` покрывает все ключевые связки или есть пробелы?
+- [ ] Добавление новой Edge Function: сколько мест трогать? (`supabase/functions/`, `movieTypes.ts`, frontend-хук, `deploy.yml`)
+- [ ] `movieEngine.ts` не разрастающийся и содержит проекцию в будущее?
 
 ### 12. AUDIT FRESHNESS
 
