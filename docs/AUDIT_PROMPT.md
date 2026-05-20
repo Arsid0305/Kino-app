@@ -1,6 +1,7 @@
 # Repository Audit — Reference Prompt
 
 Вставить этот файл целиком в начало аудита любому AI.  
+Перед запуском — убедиться что блок «Контекст проекта» актуален.
 
 ---
 
@@ -26,29 +27,29 @@ Edge Functions: ai-chat, movie-recommendation
 Тесты: Vitest (npm test)
 Design System: git submodule kino-design-system/ (github.com/Arsid0305/design-system)
 
-CI/CD:
-  automerge.yml — claude/** и cursor/** → main автоматически, conflict guard
-  promote.yml   — тесты перед деплоем
+CI/CD: ДВУХСТУПЕНЧАТЫЙ WORKFLOW (намеренно):
+  automerge.yml — claude/** и cursor/** → dev автоматически, conflict guard
+  promote.yml   — dev → main после npm test + build (НЕ ТРОГАТЬ)
   deploy.yml    — Edge Functions при изменении supabase/functions/**
 
 SSOT этого проекта:
-  git workflow          → .github/workflows/automerge.yml
-  логика рекомендаций    → src/lib/movieEngine.ts
-  типы фильмов        → src/lib/movieTypes.ts
-  Edge Functions        → supabase/functions/
-  правила AI-работы       → CLAUDE.md
+  git workflow          → .github/workflows/automerge.yml (→ dev), promote.yml (dev → main)
+  логика рекомендаций  → src/lib/movieEngine.ts
+  типы фильмов         → src/lib/movieTypes.ts
+  Edge Functions       → supabase/functions/
+  правила AI-работы    → CLAUDE.md
 
 Вторичные источники (должны совпадать с SSOT):
-  CLAUDE.md §Инфраструктура  → должен совпадать с automerge.yml
-  CLAUDE.md §Рабочий процесс → должен отражать реальную схему ветвления
-  Edge Functions        → должны соответствовать типам из movieTypes.ts
+  CLAUDE.md §Инфраструктура  → должен совпадать с automerge.yml и promote.yml
+  CLAUDE.md §Рабочий процесс → должен отражать схему claude/... → dev → main
+  Edge Functions            → должны соответствовать типам из movieTypes.ts
 ```
 
 **НЕ проверять** (нерелевантно для персонального проекта):
 - multi-user RBAC и изоляция тенантов
 - GDPR / compliance
 - Docker / Kubernetes / horizontal scaling
-- §10 ЗАВИСИМОСТИ — frontend-зависимости вынесены за скопапростого аудита
+- §10 ЗАВИСИМОСТИ — frontend-зависимости вынесены за скоп простого аудита
 
 ---
 
@@ -59,7 +60,7 @@ SSOT этого проекта:
 | Pass | Секции | Фокус |
 |------|--------|-------|
 | 1 — Корректность | §1, §3, §8 | SSOT sync, чистота слоёв, обработка ошибок |
-| 2 — Безопасность + документация | §6, §7, §5, §5.1, §5.2 | security, dead code, docs vs reality |
+| 2 — Безопасность + документация | §6, §7, §5, §5.1 | security, dead code, docs vs reality |
 | 3 — CI + архитектура | §4, §9, §11, §12 | CI/CD, производительность, freshness |
 
 Каждый pass — свой мини-отчёт в формате §«Формат отчёта».
@@ -70,10 +71,12 @@ SSOT этого проекта:
 
 ### 1. СИНХРОНИЗАЦИЯ (SSOT → вторичные источники)
 
-- [ ] `automerge.yml` совпадает с описанием в `CLAUDE.md §Инфраструктура`
-- [ ] `CLAUDE.md §Рабочий процесс` отражает реальную схему `claude/... → main`
-- [ ] Типы фильмов в Edge Functions соответствуют типам из `src/lib/movieTypes.ts`
-- [ ] Логика `ai-chat` и `movie-recommendation` соответствует что декларирует `movieEngine.ts`
+- [ ] `automerge.yml` мержит в `dev` (не в `main`) — двухступенчатый workflow
+- [ ] `promote.yml` существует и мержит `dev → main` после тестов
+- [ ] `CLAUDE.md §Инфраструктура` совпадает с реальными workflow файлами
+- [ ] `CLAUDE.md §Рабочий процесс` отражает схему `claude/... → dev → main`
+- [ ] Типы фильмов в Edge Functions соответствуют `src/lib/movieTypes.ts`
+- [ ] Логика `ai-chat` и `movie-recommendation` соответствует декларациям `movieEngine.ts`
 
 ### 2. ВНЕШНИЕ API И КЛИЕНТЫ
 
@@ -92,11 +95,12 @@ SSOT этого проекта:
 ### 4. CI/CD
 
 - [ ] `automerge.yml` триггер ограничен `claude/**` и `cursor/**`
-- [ ] `promote.yml` запускает `npm ci && npm test && npm run build` перед мержем
+- [ ] `automerge.yml` мержит в `dev`, не в `main`
+- [ ] `promote.yml` запускает `npm ci && npm test && npm run build` перед мержем dev → main
 - [ ] `deploy.yml` триггерится только на `supabase/functions/**`
-- [ ] При конфликте мержа — abort + exit 1, не зависает
+- [ ] При конфликте мержа в automerge — abort + exit 1, не зависает
+- [ ] Нет `-X theirs` в automerge.yml
 - [ ] Нет `--no-verify`, нет force push в main
-- [ ] Actions закреплены по commit SHA, не по тегу
 
 ### 5. ДОКУМЕНТАЦИЯ vs РЕАЛЬНОСТЬ
 
@@ -105,7 +109,7 @@ SSOT этого проекта:
 find . -name '*.md' -not -path './.git/*' -not -path '*/kino-design-system/*'
 ```
 
-- [ ] `CLAUDE.md §Инфраструктура` — описание workflow совпадает с `automerge.yml`
+- [ ] `CLAUDE.md §Инфраструктура` — описание workflow совпадает с реальными workflow файлами
 - [ ] `CLAUDE.md §Среда Claude` — статусы инструментов актуальны
 - [ ] Все пути в `.md` реально существуют в репо
 - [ ] `README.md` — есть, не пустой
@@ -114,13 +118,13 @@ find . -name '*.md' -not -path './.git/*' -not -path '*/kino-design-system/*'
 
 | Что сверять | Источник (SSOT) | Вторичные |
 |---|---|---|
-| Git workflow | `automerge.yml` | `CLAUDE.md §Инфраструктура`, `CLAUDE.md §Рабочий процесс` |
+| Git workflow | `automerge.yml` + `promote.yml` | `CLAUDE.md §Инфраструктура`, `CLAUDE.md §Рабочий процесс` |
 | Типы данных | `movieTypes.ts` | Edge Functions, `movieEngine.ts` |
 | UI-компоненты | `kino-design-system/` | `src/components/` |
 
-- [ ] Git workflow одинаков во всех источниках
-- [ ] Типы в Edge Functions импортируются из `movieTypes.ts`, не дублируются
-- [ ] UI использует токены из design system, не хардкод цвета/отступы
+- [ ] Git workflow одинаков во всех источниках: automerge → dev, promote.yml → main
+- [ ] Типы в Edge Functions не дублируются из `movieTypes.ts`
+- [ ] UI использует токены из design system, не хардкод
 
 ### 6. БЕЗОПАСНОСТЬ
 
@@ -138,20 +142,18 @@ find . -name '*.md' -not -path './.git/*' -not -path '*/kino-design-system/*'
 - [ ] Нет неиспользуемых Edge Functions в `supabase/functions/`
 - [ ] Нет типов в `movieTypes.ts` которые не используются нигде
 - [ ] Нет устаревших workflow файлов в `.github/workflows/`
-- [ ] Нет компонентов в `src/` которые не импортируются нигде
 
 ### 8. ОБРАБОТКА ОШИБОК
 
 - [ ] Edge Functions возвращают понятный HTTP-код при ошибке, не только 500
 - [ ] Ошибки в `movieEngine.ts` обрабатываются, не падают скрытно
-- [ ] Frontend отображает ошибки AI/сети пользователю (toast/fallback), не остаётся висеть
+- [ ] Frontend отображает ошибки AI/сети пользователю (toast/fallback)
 - [ ] `automerge.yml` abort при конфликте, не зависает
 
 ### 9. НАБЛЮДАЕМОСТЬ
 
 - [ ] Ошибки Edge Functions логируются в Supabase Logs
 - [ ] Frontend-ошибки не содержат секретов в `console.log`
-- [ ] Vercel превью работает на `claude/**` ветках
 
 ### 10. ЗАВИСИМОСТИ
 
@@ -160,8 +162,8 @@ _Не входит в скоп простого аудита._
 ### 11. АРХИТЕКТУРНЫЙ СМЫСЛ
 
 - [ ] Что можно удалить без потери функциональности
-- [ ] Добавление новой Edge Function: сколько мест трогать? (`supabase/functions/`, `movieTypes.ts`, frontend-хук, `deploy.yml`)
-- [ ] `movieEngine.ts` не разрастающийся и содержит проекцию в будущее?
+- [ ] Добавление новой Edge Function: сколько мест трогать?
+- [ ] `movieEngine.ts` — есть ли признаки God Object?
 
 ### 12. AUDIT FRESHNESS
 
