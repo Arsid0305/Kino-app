@@ -1,4 +1,4 @@
-name: Auto-merge feature branches
+name: Auto-merge to main
 
 on:
   push:
@@ -28,8 +28,9 @@ jobs:
         run: |
           git config user.email "actions@github.com"
           git config user.name "GitHub Actions"
-          git checkout main
           git fetch origin "$BRANCH_NAME"
+          git checkout main
+          git pull origin main
           if ! git merge --no-ff "$BRANCH_NAME" -m "Auto-merge $BRANCH_NAME into main"; then
             echo "ERROR: Merge conflict detected. Aborting." >&2
             git merge --abort
