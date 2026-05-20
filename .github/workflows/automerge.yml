@@ -6,7 +6,7 @@ on:
       - claude/**
 
 jobs:
-  automerge-to-dev:
+  automerge-to-main:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -14,15 +14,15 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Merge into dev
+      - name: Merge into main
         run: |
           git config user.email "actions@github.com"
           git config user.name "GitHub Actions"
-          git fetch origin dev
-          git checkout dev
-          if ! git merge --no-ff ${{ github.ref_name }} -m "Auto-merge ${{ github.ref_name }} into dev"; then
+          git fetch origin main
+          git checkout main
+          if ! git merge --no-ff ${{ github.ref_name }} -m "Auto-merge ${{ github.ref_name }} into main"; then
             echo "Merge conflict detected — aborting"
             git merge --abort
             exit 1
           fi
-          git push origin dev
+          git push origin main
