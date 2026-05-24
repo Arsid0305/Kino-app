@@ -7,7 +7,11 @@ const MAX_REQUESTS_PER_MINUTE = 10;
 const MAX_MOVIES = 80;
 const DEFAULT_DEEPSEEK_MODEL = "deepseek-chat";
 
-const rateLimits = new Map<string, { count: number; resetAt: number }>();
+// Admin client for rate limiting — uses service role key, persists across cold starts
+const supabaseAdmin = createClient(
+  Deno.env.get("SUPABASE_URL") ?? "",
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+);
 
 function getAllowedOrigins(): string[] {
   return (Deno.env.get("ALLOWED_ORIGINS") ?? "").split(",").map(o => o.trim()).filter(Boolean);
@@ -41,13 +45,17 @@ function getClientIp(req: Request): string {
     ?? "unknown";
 }
 
-function checkRateLimit(key: string): boolean {
-  const now = Date.now();
-  const limit = rateLimits.get(key);
-  if (!limit || now > limit.resetAt) { rateLimits.set(key, { count: 1, resetAt: now + 60_000 }); return true; }
-  if (limit.count >= MAX_REQUESTS_PER_MINUTE) return false;
-  limit.count++;
-  return true;
+async function checkRateLimit(key: string): Promise<boolean> {
+  const { data, error } = await supabaseAdmin.rpc("check_and_increment_rate_limit", {
+    p_key: key,
+    p_max_count: MAX_REQUESTS_PER_MINUTE,
+    p_window_ms: 60000,
+  });
+  if (error) {
+    console.error("Rate limit DB error:", error);
+    return true; // fail open — avoid blocking legit requests on transient DB errors
+  }
+  return data as boolean;
 }
 
 function isMovieContext(value: unknown): boolean {
@@ -86,7 +94,7 @@ serve(async req => {
     if (authError || !user) return jsonResponse(origin, 401, { error: "Неверный токен доступа" });
 
     const rateLimitKey = `${user.id}:${getClientIp(req)}`;
-    if (!checkRateLimit(rateLimitKey)) return jsonResponse(origin, 429, { error: "Слишком много запросов. Подождите минуту." });
+    if (!await checkRateLimit(rateLimitKey)) return jsonResponse(origin, 429, { error: "Слишком много запросов. Подождите минуту." });
 
     const body = await req.json().catch(() => null) as {
       filters?: unknown;
@@ -139,7 +147,7 @@ serve(async req => {
           },
           {
             role: "user",
-            content: `Порекомендуй РОВНО 3 фильма или сериала, похожих по духу и стилю. Все три строго отсутствуют в списке ЗАПРЕЩЁННЫХ.\n\nЗАПРЕЩЁННЫЕ (абсолютный запрет): ${forbidden || "нет"}\n\nФильтры: ${filters.length > 0 ? filters.join(", ") : "без ограничений"}\nВкусовой профиль: ${tasteProfile || "пуст"}\n\nВерни ТОЛЬКО JSON-объект с массивом из 3 элементов:\n{"recommendations":[{"title":"...","titleRu":"...","year":2020,"type":"film","genre":["жанр"],"duration":100,"director":"...","description":"Синопсис","reasonToWatch":"Почему подходит","mood":["настроение"],"timeOfDay":["evening"],"format":"medium","forCompany":"any","kpRating":7.5,"country":"США","predictedRating":8.0},{"title":"...","titleRu":"...","year":2018,"type":"film","genre":["жанр"],"duration":95,"director":"...","description":"Синопсис","reasonToWatch":"Почему подходит","mood":["настроение"],"timeOfDay":["evening"],"format":"medium","forCompany":"any","kpRating":7.2,"country":"Франция","predictedRating":7.8},{"title":"...","titleRu":"...","year":2016,"type":"film","genre":["жанр"],"duration":110,"director":"...","description":"Синопсис","reasonToWatch":"Почему подходит","mood":["настроение"],"timeOfDay":["evening"],"format":"medium","forCompany":"any","kpRating":7.0,"country":"Великобритания","predictedRating":7.5}]}`,
+            content: `Порекомендуй РОВНО 3 фильма или сериала, похожих по духу и стилю. Все три строго отсутствуют в списке ЗАПРЕЦЁННЫХ.\n\nЗАПРЕЦЁННЫЕ (абсолютный запрет): ${forbidden || "нет"}\n\nФильтры: ${filters.length > 0 ? filters.join(", ") : "без ограничений"}\nВкусовой профиль: ${tasteProfile || "пуст"}\n\nВерни ТОЛЬКО JSON-объект с массивом из 3 элементов:\n{"recommendations":[{"title":"...","titleRu":"...","year":2020,"type":"film","genre":["жанр"],"duration":100,"director":"...","description":"Синопсис","reasonToWatch":"Почему подходит","mood":["настроение"],"timeOfDay":["evening"],"format":"medium","forCompany":"any","kpRating":7.5,"country":"США","predictedRating":8.0},{"title":"...","titleRu":"...","year":2018,"type":"film","genre":["жанр"],"duration":95,"director":"...","description":"Синопсис","reasonToWatch":"Почему подходит","mood":["настроение"],"timeOfDay":["evening"],"format":"medium","forCompany":"any","kpRating":7.2,"country":"Франция","predictedRating":7.8},{"title":"...","titleRu":"...","year":2016,"type":"film","genre":["жанр"],"duration":110,"director":"...","description":"Синопсис","reasonToWatch":"Почему подходит","mood":["настроение"],"timeOfDay":["evening"],"format":"medium","forCompany":"any","kpRating":7.0,"country":"Великобритания","predictedRating":7.5}]}`,
           },
         ],
         stream: false,
@@ -182,7 +190,7 @@ serve(async req => {
       const titleRu = typeof movie.titleRu === "string" ? movie.titleRu.toLowerCase().trim() : "";
       const title = typeof movie.title === "string" ? movie.title.toLowerCase().trim() : "";
       const allowed = !forbiddenTitleSet.has(titleRu) && !forbiddenTitleSet.has(title);
-      if (!allowed) console.log(`Отфильтровано (запрещено): ${movie.titleRu ?? movie.title}`);
+      if (!allowed) console.log(`ОтфильтроваCо (запрещено): ${movie.titleRu ?? movie.title}`);
       return allowed;
     }).slice(0, 2);
 

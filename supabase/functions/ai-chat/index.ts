@@ -16,6 +16,12 @@ const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6";
 
 type Provider = "deepseek" | "gpt4o" | "gemini" | "claude";
 
+// Admin client for rate limiting — uses service role key, persists across cold starts
+const supabaseAdmin = createClient(
+  Deno.env.get("SUPABASE_URL") ?? "",
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+);
+
 async function callOpenAICompat(
   apiKey: string,
   baseUrl: string,
@@ -172,7 +178,6 @@ async function tavilySearch(query: string): Promise<string> {
   }
 }
 
-const rateLimits = new Map<string, { count: number; resetAt: number }>();
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
 function getAllowedOrigins(): string[] {
@@ -207,13 +212,17 @@ function getClientIp(req: Request): string {
     ?? "unknown";
 }
 
-function checkRateLimit(key: string): boolean {
-  const now = Date.now();
-  const limit = rateLimits.get(key);
-  if (!limit || now > limit.resetAt) { rateLimits.set(key, { count: 1, resetAt: now + 60_000 }); return true; }
-  if (limit.count >= MAX_REQUESTS_PER_MINUTE) return false;
-  limit.count++;
-  return true;
+async function checkRateLimit(key: string): Promise<boolean> {
+  const { data, error } = await supabaseAdmin.rpc("check_and_increment_rate_limit", {
+    p_key: key,
+    p_max_count: MAX_REQUESTS_PER_MINUTE,
+    p_window_ms: 60000,
+  });
+  if (error) {
+    console.error("Rate limit DB error:", error);
+    return true; // fail open — avoid blocking legit requests on transient DB errors
+  }
+  return data as boolean;
 }
 
 function isChatMessage(value: unknown): value is ChatMessage {
@@ -250,7 +259,7 @@ serve(async req => {
     if (authError || !user) return jsonResponse(origin, 401, { error: "Неверный токен доступа" });
 
     const rateLimitKey = `${user.id}:${getClientIp(req)}`;
-    if (!checkRateLimit(rateLimitKey)) return jsonResponse(origin, 429, { error: "Слишком много запросов. Подождите минуту." });
+    if (!await checkRateLimit(rateLimitKey)) return jsonResponse(origin, 429, { error: "Слишком много запросов. Подождите минуту." });
 
     const body = await req.json().catch(() => null) as {
       provider?: unknown;

@@ -87,12 +87,7 @@ const ProviderIcon = ({ id }: { id: Provider }) => {
 async function getAccessToken(): Promise<string> {
   const { data: sessionData } = await supabase.auth.getSession();
   if (sessionData.session?.access_token) return sessionData.session.access_token;
-
-  const { data: anonData, error: anonError } = await supabase.auth.signInAnonymously();
-  if (anonError || !anonData.session?.access_token) {
-    throw new Error('Не удалось открыть анонимную сессию Supabase');
-  }
-  return anonData.session.access_token;
+  throw new Error('Требуется авторизация. Пожалуйста, войдите в аккаунт.');
 }
 
 function normalizeSuggestions(movies: Movie[] | undefined): Movie[] {
@@ -322,7 +317,7 @@ export const AiAdvisor = ({
                       }`}
                     >
                       <ProviderIcon id={p.id} />
-                      {p.label}
+                      <span>{p.label}</span>
                     </button>
                   ))}
                 </div>
