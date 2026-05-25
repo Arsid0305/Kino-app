@@ -116,7 +116,8 @@ export async function loadCloudLibrary(): Promise<CloudLibrary> {
   const { data, error } = await supabase
     .from('user_movies')
     .select('*')
-    .order('updated_at', { ascending: false });
+    .order('updated_at', { ascending: false })
+    .limit(500);
 
   if (error) throw error;
 

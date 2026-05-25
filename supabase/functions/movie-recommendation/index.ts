@@ -7,6 +7,12 @@ const MAX_REQUESTS_PER_MINUTE = 10;
 const MAX_MOVIES = 80;
 const DEFAULT_DEEPSEEK_MODEL = "deepseek-chat";
 
+const DEFAULT_ORIGINS = [
+  "https://kino-app-arsid.vercel.app",
+  "https://kino-app-eight.vercel.app",
+  "https://kino-app-git-main-arsid.vercel.app",
+];
+
 // Admin client for rate limiting — uses service role key, persists across cold starts
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL") ?? "",
@@ -14,20 +20,19 @@ const supabaseAdmin = createClient(
 );
 
 function getAllowedOrigins(): string[] {
-  return (Deno.env.get("ALLOWED_ORIGINS") ?? "").split(",").map(o => o.trim()).filter(Boolean);
+  const env = (Deno.env.get("ALLOWED_ORIGINS") ?? "").split(",").map(o => o.trim()).filter(Boolean);
+  return env.length > 0 ? env : DEFAULT_ORIGINS;
 }
 
 function isOriginAllowed(origin: string | null): boolean {
   const allowed = getAllowedOrigins();
-  if (allowed.length === 0) return true;
   if (!origin) return false;
   return allowed.includes(origin);
 }
 
 function getCorsHeaders(origin: string | null) {
   const allowed = getAllowedOrigins();
-  const allowOrigin = allowed.length === 0 ? "*"
-    : origin && allowed.includes(origin) ? origin : allowed[0];
+  const allowOrigin = origin && allowed.includes(origin) ? origin : allowed[0];
   return { "Access-Control-Allow-Origin": allowOrigin, "Access-Control-Allow-Headers": DEFAULT_ALLOWED_HEADERS };
 }
 
@@ -56,6 +61,13 @@ async function checkRateLimit(key: string): Promise<boolean> {
     return true; // fail open — avoid blocking legit requests on transient DB errors
   }
   return data as boolean;
+}
+
+function sanitizeTasteProfile(raw: string): string {
+  return raw
+    .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .slice(0, 2000);
 }
 
 function isMovieContext(value: unknown): boolean {
@@ -107,7 +119,7 @@ serve(async req => {
     if (!body || typeof body !== "object") return jsonResponse(origin, 400, { error: "Некорректное тело запроса" });
 
     const filters = Array.isArray(body.filters) ? body.filters.map(String).slice(0, 12) : [];
-    const tasteProfile = typeof body.tasteProfile === "string" ? body.tasteProfile.slice(0, 6000) : "";
+    const tasteProfile = typeof body.tasteProfile === "string" ? sanitizeTasteProfile(body.tasteProfile) : "";
     const watchedMovies = Array.isArray(body.watchedMovies)
       ? body.watchedMovies.filter(isMovieContext).slice(0, MAX_MOVIES) : [];
     const watchlistMovies = Array.isArray(body.watchlistMovies)
