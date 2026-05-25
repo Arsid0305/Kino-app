@@ -197,7 +197,7 @@ Design system — отдельный репо `github.com/Arsid0305/design-syste
 ### Когда использовать
 
 | Ситуация | Вместо | Использовать |
-|----------|--------|--------------|
+|----------|--------|-------------- |
 | Большой файл (>5 KB) | Read → весь файл в контекст | `ctx_execute` — скрипт выводит только нужное |
 | Fetch URL / документация | WebFetch → сырой HTML | `ctx_fetch_and_index` → `ctx_search` |
 | Несколько grep/find подряд | Bash × N вызовов | `ctx_batch_execute` — один вызов |
@@ -268,10 +268,12 @@ Claude инициирует проверку сам перед первым де
 - **Бэкенд**: Supabase Edge Functions — деплоит автоматически через GitHub Actions
 - **БД и Auth**: Supabase, проект `ovhwxfdtkzwxfomdlgjv`
 - **Репо**: github.com/arsid0305/kino-app
-- `.github/workflows/automerge.yml` — `claude/**` и `cursor/**` → `main` автоматически, conflict guard (abort + exit 1)
+- `.github/workflows/automerge.yml` — PR из `claude/**` или `cursor/**` → автомерж в `main` через GitHub API
 - `.github/workflows/promote.yml` — тесты перед деплоем в `main` (не трогать)
 - `.github/workflows/deploy.yml` — Edge Functions при изменении `supabase/functions/**`
 - `SBP_ACCESS_TOKEN` — в GitHub Secrets ✅
+
+> **Требует:** Settings → General → «Allow auto-merge» включён в репо
 
 ### API ключи (в Supabase Secrets)
 - `ANTHROPIC_API_KEY` ✅
@@ -353,12 +355,15 @@ package.json
 
 ## Рабочий процесс
 
-Схема: `ветка claude/...` → `main` (авто, через CI)
+Схема: `claude/...` или `cursor/...` → PR → автомерж в `main`
 
 1. Claude пишет код → пушит в ветку `claude/...`
-2. После каждого пуша — создать PR в `main` (если не существует)
-3. `automerge.yml` мержит ветку в `main` автоматически (конфликт = abort + exit 1)
-4. Никогда не пушить напрямую в `main`
+2. Создать PR в `main` (если не существует)
+3. `automerge.yml` запускается на PR-событии и мержит через GitHub API (`squash`)
+4. Никакого shell-мержа — только GitHub API
+5. Никогда не пушить напрямую в `main`
+
+> **Требует:** Settings → General → «Allow auto-merge» включён в репо
 
 ---
 
