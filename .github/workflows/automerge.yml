@@ -3,12 +3,12 @@ name: Auto-merge claude/cursor branches
 on:
   pull_request:
     branches: [main]
-    types: [opened, reopened, synchronize]
+    types: [opened, reopened, synchronize, ready_for_review]
 
 jobs:
   automerge:
     runs-on: ubuntu-latest
-    if: startsWith(github.head_ref, 'claude/') || startsWith(github.head_ref, 'cursor/')
+    if: (startsWith(github.head_ref, 'claude/') || startsWith(github.head_ref, 'cursor/')) && github.event.pull_request.draft == false
     permissions:
       pull-requests: write
       contents: write
