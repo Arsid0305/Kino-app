@@ -14,12 +14,6 @@ const DEFAULT_OPENAI_MODEL = "gpt-4o";
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
 const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6";
 
-const DEFAULT_ORIGINS = [
-  "https://kino-app-arsid.vercel.app",
-  "https://kino-app-eight.vercel.app",
-  "https://kino-app-git-main-arsid.vercel.app",
-];
-
 type Provider = "deepseek" | "gpt4o" | "gemini" | "claude";
 
 // Admin client for rate limiting — uses service role key, persists across cold starts
@@ -194,19 +188,20 @@ function sanitizeTasteProfile(raw: string): string {
 type ChatMessage = { role: "user" | "assistant"; content: string };
 
 function getAllowedOrigins(): string[] {
-  const env = (Deno.env.get("ALLOWED_ORIGINS") ?? "").split(",").map(o => o.trim()).filter(Boolean);
-  return env.length > 0 ? env : DEFAULT_ORIGINS;
+  return (Deno.env.get("ALLOWED_ORIGINS") ?? "").split(",").map(o => o.trim()).filter(Boolean);
 }
 
 function isOriginAllowed(origin: string | null): boolean {
   const allowed = getAllowedOrigins();
+  if (allowed.length === 0) return true;
   if (!origin) return false;
   return allowed.includes(origin);
 }
 
 function getCorsHeaders(origin: string | null) {
   const allowed = getAllowedOrigins();
-  const allowOrigin = origin && allowed.includes(origin) ? origin : allowed[0];
+  const allowOrigin = allowed.length === 0 ? "*"
+    : origin && allowed.includes(origin) ? origin : allowed[0];
   return { "Access-Control-Allow-Origin": allowOrigin, "Access-Control-Allow-Headers": DEFAULT_ALLOWED_HEADERS };
 }
 
@@ -232,7 +227,7 @@ async function checkRateLimit(key: string): Promise<boolean> {
   });
   if (error) {
     console.error("Rate limit DB error:", error);
-    return true; // fail open — avoid blocking legit requests on transient DB errors
+    return true;
   }
   return data as boolean;
 }
@@ -394,16 +389,15 @@ ${tasteProfile || "еще формируется"}
 }
 
 Правила:
-- suggestions: ВСЕГДА РОВНО 2 фильма/сериала. Не 1, не 3 — именно 2. Никаких исключений. Оба похожи по духу, стилю или теме.
+- suggestions: ВСЕГДА РОВНО 2 фильма/сериала. Не 1, не 3 — именно 2.
 - reply: только короткое вступление, детали в карточках
 - все поля обязательны
 - type: только "film", "series" или "miniseries"
 - format: только "short", "medium" или "long"
 - forCompany: только "solo", "pair", "group" или "any"
 - timeOfDay: массив из "morning", "afternoon", "evening", "night"
-- description и reasonToWatch — ОБЯЗАТЕЛЬНО на русском языке (никогда на английском, даже если оригинал английский)
-- genre и mood — на русском (примеры: "драма", "комедия", "задумчивое", "весёлое")
-- только русские слова в тексте reply, description, reasonToWatch, genre, mood`;
+- description и reasonToWatch — ОБЯЗАТЕЛЬНО на русском языке
+- genre и mood — на русском`;
 
     const raw = await callProvider(provider, systemPrompt, safeMessages);
 
