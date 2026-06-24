@@ -738,7 +738,7 @@ const Index = () => {
               style={{ top: 0 }}
               onClick={e => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
+              <div className="safe-top flex items-center justify-between px-4 pb-3 border-b border-border shrink-0">
                 <h3 className="font-display text-lg text-foreground">
                   {listModal === 'watchlist' ? `Буду смотреть (${customMovies.length})` : `Исключено (${dismissedMovies.length})`}
                 </h3>
