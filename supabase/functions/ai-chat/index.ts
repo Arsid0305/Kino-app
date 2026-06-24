@@ -270,6 +270,7 @@ serve(async req => {
 
     const body = await req.json().catch(() => null) as {
       provider?: unknown;
+      mode?: unknown;
       messages?: unknown;
       filters?: unknown;
       tasteProfile?: unknown;
@@ -297,6 +298,7 @@ serve(async req => {
 
     const provider: Provider = (["claude", "gpt4o", "gemini", "deepseek"] as const).includes(body.provider as Provider)
       ? (body.provider as Provider) : "claude";
+    const mode: "chat" | "title_lookup" = body.mode === "title_lookup" ? "title_lookup" : "chat";
 
     const filters = Array.isArray(body.filters) ? body.filters.map(String).slice(0, 12) : [];
     const tasteProfile = typeof body.tasteProfile === "string" ? sanitizeTasteProfile(body.tasteProfile) : "";
@@ -342,7 +344,50 @@ serve(async req => {
     const watchlistTitles = (watchlistMovies as MovieCtx[]).map(m => m.titleRu ?? m.title ?? "").filter(Boolean).join(", ");
     const dismissedTitles = (dismissedMovies as MovieCtx[]).map(m => m.titleRu ?? m.title ?? "").filter(Boolean).join(", ");
 
-    const systemPrompt = `Ты — персональный киносоветник. Отвечай на русском языке.
+    const titleLookupPrompt = `Ты — кинокаталог. Сегодняшняя дата: ${currentDate}. ${oscarNote}
+${searchSection}
+Пользователь ищет конкретный фильм или сериал по названию: "${lastUserMsg}".
+
+Задача:
+- определи точно, какой фильм/сериал имеется в виду (используй данные из интернета выше, если они есть)
+- если уверен в идентификации — верни РОВНО ОДИН объект в suggestions с точными данными
+- если не нашёл точное совпадение или не уверен — верни suggestions: [] и короткое объяснение в reply на русском
+- НЕ выдумывай год, режиссёра или рейтинг — если факт неизвестен точно, не указывай его
+- никогда не упоминай Кинопоиск, не говори «нет в каталоге», «недоступно»
+
+ВАЖНО: Всегда отвечай ТОЛЬКО валидным JSON без markdown, без \`\`\`, в следующем формате:
+{
+  "reply": "короткий ответ на русском, 1 предложение",
+  "suggestions": [
+    {
+      "title": "original title",
+      "titleRu": "русское название",
+      "year": 2021,
+      "type": "film",
+      "genre": ["драма", "триллер"],
+      "duration": 120,
+      "director": "Имя Режиссёра",
+      "description": "краткий синопсис 2-3 предложения",
+      "mood": ["задумчивое"],
+      "timeOfDay": ["evening"],
+      "format": "medium",
+      "forCompany": "any",
+      "kpRating": 7.8,
+      "country": "США"
+    }
+  ]
+}
+
+Правила:
+- suggestions: РОВНО 1 объект если фильм найден, иначе пустой массив []
+- type: только "film", "series" или "miniseries"
+- format: только "short", "medium" или "long"
+- forCompany: только "solo", "pair", "group" или "any"
+- timeOfDay: массив из "morning", "afternoon", "evening", "night"
+- description — ОБЯЗАТЕЛЬНО на русском языке
+- genre и mood — на русском`;
+
+    const chatPrompt = `Ты — персональный киносоветник. Отвечай на русском языке.
 Сегодняшняя дата: ${currentDate}. ${oscarNote}
 ${searchSection}
 Твоя задача:
@@ -399,6 +444,8 @@ ${tasteProfile || "еще формируется"}
 - description и reasonToWatch — ОБЯЗАТЕЛЬНО на русском языке
 - genre и mood — на русском`;
 
+    const systemPrompt = mode === "title_lookup" ? titleLookupPrompt : chatPrompt;
+
     const raw = await callProvider(provider, systemPrompt, safeMessages);
 
     if (!raw) return jsonResponse(origin, 500, { error: "AI вернул пустой ответ" });
@@ -440,7 +487,7 @@ ${tasteProfile || "еще формируется"}
         .filter(Boolean)
     );
 
-    const suggestions = rawSuggestions.filter(s => {
+    const suggestions = mode === "title_lookup" ? rawSuggestions.slice(0, 1) : rawSuggestions.filter(s => {
       if (!s || typeof s !== "object") return true;
       const mov = s as Record<string, unknown>;
       const titleRu = typeof mov.titleRu === "string" ? mov.titleRu.toLowerCase().trim() : "";

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Session } from '@supabase/supabase-js';
-import { Clapperboard, Clock, History, Sparkles, Star, Trash2, User, X } from 'lucide-react';
+import { Clapperboard, Clock, History, Loader2, Search, Sparkles, Star, Trash2, User, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { FilterSection } from '@/components/FilterSection';
 import { MovieCard } from '@/components/MovieCard';
@@ -38,6 +38,7 @@ import {
   upsertWatchlistMovies,
 } from '@/lib/supabaseMovieStore';
 import { requestGlobalRecommendation } from '@/lib/globalRecommendation';
+import { searchMovieByTitle } from '@/lib/titleSearch';
 
 type Tab = 'recommend' | 'history';
 
@@ -69,6 +70,10 @@ const Index = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [syncStatus, setSyncStatus] = useState('Локальный режим');
   const [loadingRecommendation, setLoadingRecommendation] = useState(false);
+  const [titleQuery, setTitleQuery] = useState('');
+  const [titleSearchLoading, setTitleSearchLoading] = useState(false);
+  const [titleSearchResult, setTitleSearchResult] = useState<Movie | null>(null);
+  const [titleSearchMessage, setTitleSearchMessage] = useState('');
 
   useEffect(() => {
     void supabase.auth.getSession().then(({ data }) => {
@@ -205,6 +210,26 @@ const Index = () => {
       setLoadingRecommendation(false);
     }
   }, [session, filters, watched, customMovies, dismissedMovies]);
+
+  const handleTitleSearch = async () => {
+    const query = titleQuery.trim();
+    if (!query || titleSearchLoading) return;
+
+    setTitleSearchLoading(true);
+    setTitleSearchMessage('');
+
+    try {
+      const { movie, message } = await searchMovieByTitle(query);
+      setTitleSearchResult(movie);
+      setTitleSearchMessage(movie ? '' : message || 'Фильм не найден.');
+    } catch (error) {
+      console.error(error);
+      setTitleSearchResult(null);
+      setTitleSearchMessage(error instanceof Error ? error.message : 'Не удалось выполнить поиск');
+    } finally {
+      setTitleSearchLoading(false);
+    }
+  };
 
   const handleRateMovie = async (movie: Movie, rating: number, notes: string) => {
     const entry: WatchedMovie = { ...movie, rating, notes, watchedAt: new Date().toISOString() };
@@ -492,6 +517,102 @@ const Index = () => {
                   />
                 ))}
               </AnimatePresence>
+
+              <div className="space-y-3 pt-2 border-t border-border">
+                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Найти конкретный фильм</p>
+                <div className="flex gap-2">
+                  <input
+                    value={titleQuery}
+                    onChange={e => setTitleQuery(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') { e.preventDefault(); void handleTitleSearch(); }
+                    }}
+                    placeholder="Название фильма или сериала..."
+                    className="flex-1 bg-secondary border border-border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => void handleTitleSearch()}
+                    disabled={titleSearchLoading || !titleQuery.trim()}
+                    className="px-4 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-40 flex items-center gap-1.5"
+                  >
+                    {titleSearchLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                    Найти
+                  </motion.button>
+                </div>
+
+                {titleSearchMessage && (
+                  <p className="text-xs text-muted-foreground text-center py-1">{titleSearchMessage}</p>
+                )}
+
+                <AnimatePresence>
+                  {titleSearchResult && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                      transition={{ duration: 0.3, ease: 'easeOut' }}
+                      className="bg-card border border-border rounded-2xl overflow-hidden cinema-glow"
+                    >
+                      <div className="p-4 space-y-2.5">
+                        <div>
+                          <h3 className="font-display text-xl text-foreground leading-tight">{titleSearchResult.titleRu}</h3>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {titleSearchResult.title}
+                            {titleSearchResult.year > 0 ? ` · ${titleSearchResult.year}` : ''}
+                            {' · '}{titleSearchResult.type === 'series' ? 'Сериал' : titleSearchResult.type === 'miniseries' ? 'Минисериал' : 'Фильм'}
+                          </p>
+                        </div>
+
+                        {titleSearchResult.description && (
+                          <p className="text-sm text-secondary-foreground leading-relaxed">{titleSearchResult.description}</p>
+                        )}
+
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                          {titleSearchResult.duration > 0 && (
+                            <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {titleSearchResult.duration} мин</span>
+                          )}
+                          {titleSearchResult.director && (
+                            <span className="flex items-center gap-1"><User className="w-3.5 h-3.5" /> {titleSearchResult.director}</span>
+                          )}
+                          {titleSearchResult.kpRating && titleSearchResult.kpRating > 0 && (
+                            <span className="flex items-center gap-1 text-primary"><Star className="w-3.5 h-3.5 fill-primary" /> КП {titleSearchResult.kpRating}</span>
+                          )}
+                        </div>
+
+                        {titleSearchResult.genre.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {titleSearchResult.genre.map(g => (
+                              <span key={g} className="px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider rounded-md bg-secondary text-secondary-foreground">{g}</span>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="flex gap-2 pt-1">
+                          <button
+                            onClick={() => void handleAddToWatchlist(titleSearchResult)}
+                            className="flex-1 py-3 rounded-xl border border-border text-foreground text-sm font-semibold flex items-center justify-center gap-2 hover:bg-secondary transition-colors"
+                          >
+                            <Star className="w-4 h-4" /> Смотрю!
+                          </button>
+                          <button
+                            onClick={() => setRatingMovie(titleSearchResult)}
+                            className="px-4 py-3 rounded-xl border border-border text-foreground text-sm font-semibold hover:bg-secondary transition-colors"
+                          >
+                            Оценить
+                          </button>
+                          <button
+                            onClick={() => { setTitleSearchResult(null); setTitleQuery(''); setTitleSearchMessage(''); }}
+                            className="px-4 py-3 rounded-xl border border-border text-muted-foreground text-sm font-medium hover:bg-secondary transition-colors"
+                          >
+                            Другой
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
 
               <div className="grid grid-cols-3 gap-2">
                 <button
