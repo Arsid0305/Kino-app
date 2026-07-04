@@ -589,24 +589,42 @@ const Index = () => {
                         )}
 
                         <div className="flex gap-2 pt-1">
-                          <button
-                            onClick={() => void handleAddToWatchlist(titleSearchResult)}
-                            className="flex-1 py-3 rounded-xl border border-border text-foreground text-sm font-semibold flex items-center justify-center gap-2 hover:bg-secondary transition-colors"
-                          >
-                            <Star className="w-4 h-4" /> Смотрю!
-                          </button>
-                          <button
-                            onClick={() => setRatingMovie(titleSearchResult)}
-                            className="px-4 py-3 rounded-xl border border-border text-foreground text-sm font-semibold hover:bg-secondary transition-colors"
-                          >
-                            Оценить
-                          </button>
-                          <button
-                            onClick={() => { setTitleSearchResult(null); setTitleQuery(''); setTitleSearchMessage(''); }}
-                            className="px-4 py-3 rounded-xl border border-border text-muted-foreground text-sm font-medium hover:bg-secondary transition-colors"
-                          >
-                            Другой
-                          </button>
+                          {(() => {
+                            const key = getMovieDedupKey(titleSearchResult);
+                            const inWatchlist = customMovies.some(m => getMovieDedupKey(m) === key);
+                            const inWatched = watched.some(m => getMovieDedupKey(m) === key);
+                            return (
+                              <>
+                                <button
+                                  onClick={() => void handleAddToWatchlist(titleSearchResult)}
+                                  disabled={inWatchlist}
+                                  className={`flex-1 py-3 rounded-xl border text-sm font-semibold flex items-center justify-center gap-2 transition-colors ${
+                                    inWatchlist
+                                      ? 'bg-primary text-primary-foreground border-primary'
+                                      : 'border-border text-foreground bg-transparent hover:bg-secondary'
+                                  }`}
+                                >
+                                  <Star className={`w-4 h-4 ${inWatchlist ? 'fill-primary-foreground' : ''}`} /> Смотрю!
+                                </button>
+                                <button
+                                  onClick={() => setRatingMovie(titleSearchResult)}
+                                  className={`px-4 py-3 rounded-xl border text-sm font-semibold transition-colors ${
+                                    inWatched
+                                      ? 'border-primary bg-primary text-primary-foreground'
+                                      : 'border-border text-foreground hover:bg-secondary'
+                                  }`}
+                                >
+                                  Оценить
+                                </button>
+                                <button
+                                  onClick={() => { setTitleSearchResult(null); setTitleQuery(''); setTitleSearchMessage(''); }}
+                                  className="px-4 py-3 rounded-xl border border-border text-muted-foreground text-sm font-medium hover:bg-secondary transition-colors"
+                                >
+                                  Другой
+                                </button>
+                              </>
+                            );
+                          })()}
                         </div>
                       </div>
                     </motion.div>
