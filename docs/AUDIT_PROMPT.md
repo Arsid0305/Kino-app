@@ -1,148 +1,49 @@
-# Repository Audit — Reference Prompt
+# Repository Audit — Kino-app
 
-Вставить этот файл целиком в начало аудита любому AI.  
-Перед запуском — убедиться что блок «Контекст проекта» актуален.
+Универсальные проверки — см. **`llm_wiki/wiki/audit-universal.md`** (canon для всех репо).
 
----
-
-## Перед началом — синхронизация
-
-Аудит на устаревшем snapshot бесполезен. До чтения кода:
-1. Прочитать последние 10 коммитов: `git log --oneline -10 main`
-2. Зафиксировать HEAD: `git rev-parse main` — указать SHA в начале отчёта
-3. Пробежать по `tasks/lessons.md` и `git log --grep=fix` за последний месяц — не повторять уже починенное
-
-Если найден баг — убедиться что он **есть в текущем HEAD**, а не в кеше.
+Этот файл — тонкий overlay с проектной спецификой Kino-app.
 
 ---
 
 ## Контекст проекта
 
 ```
-Тип проекта: веб-приложение для рекомендации фильмов с AI-советником
+Тип: веб-приложение для рекомендации фильмов с AI-советником
 Стек: React + Vite + TypeScript + Tailwind + shadcn/ui + Framer Motion
 Бэкенд: Supabase Auth (email OTP + анонимный) + Edge Functions (Deno)
 Edge Functions: ai-chat, movie-recommendation
-Деплой: Vercel (фронтенд, main) + GitHub Actions (Edge Functions)
-Тесты: Vitest (npm test)
+Деплой: Vercel (frontend) + GitHub Actions (Edge Functions)
 Design System: git submodule kino-design-system/ (github.com/Arsid0305/design-system)
-
-CI/CD:
-  automerge.yml — claude/** и cursor/** → main автоматически, conflict guard
-  promote.yml   — пост-мерж тесты (НЕ ТРОГАТЬ)
-  deploy.yml    — Edge Functions при изменении supabase/functions/**
-
-SSOT этого проекта:
-  git workflow          → .github/workflows/automerge.yml (claude/**, cursor/** → main)
-  логика рекомендаций  → src/lib/movieEngine.ts
-  типы фильмов         → src/lib/movieTypes.ts
-  Edge Functions       → supabase/functions/
-  правила AI-работы    → CLAUDE.md
-
-Вторичные источники (должны совпадать с SSOT):
-  CLAUDE.md §Инфраструктура  → должен совпадать с automerge.yml (claude/** → main)
-  CLAUDE.md §Рабочий процесс → должен отражать схему claude/... → main
-  Edge Functions            → должны соответствовать типам из movieTypes.ts
 ```
 
-**НЕ проверять** (нерелевантно для персонального проекта):
-- multi-user RBAC и изоляция тенантов
-- GDPR / compliance
-- Docker / Kubernetes / horizontal scaling
-- §10 ЗАВИСИМОСТИ — frontend-зависимости вынесены за скоп простого аудита
+## Проектные проверки (в дополнение к universal)
 
----
+**Supabase Edge Functions:**
+- [ ] Обе функции (`ai-chat`, `movie-recommendation`) имеют `verify_jwt: true`
+- [ ] Каждая функция валидирует JWT через `supabase.auth.getUser(token)` → 401 при невалидном
+- [ ] `user_id` берётся из верифицированного токена, НЕ из тела запроса
+- [ ] CORS ограничен: `Access-Control-Allow-Origin: https://kino-app.vercel.app` (не `*`)
+- [ ] Входные данные валидируются через `zod` до обращения к БД
 
-## Pipeline — 3 pass
+**Auth / RLS:**
+- [ ] RLS включён на **каждой** таблице `public` схемы
+- [ ] Политики через `auth.uid() = user_id`, не открыты анонимам
+- [ ] Rate limiting на OTP-endpoint (иначе спам)
 
-| Pass | Секции | Фокус |
-|------|--------|-------|
-| 1 — Корректность | §1, §3, §8 | SSOT sync, чистота слоёв, обработка ошибок |
-| 2 — Безопасность + документация | §6, §7, §5 | security, dead code, docs vs reality |
-| 3 — CI + архитектура | §4, §9, §11, §12 | CI/CD, производительность, freshness |
+**Frontend:**
+- [ ] `service_role` ключ НЕ в `VITE_*` — только в Edge Functions / GitHub Secrets
+- [ ] В `vite.config.ts` нет `build.sourcemap: true`
+- [ ] `.env` в `.gitignore`, нет `.env` в истории git
 
----
+**Design System:**
+- [ ] `kino-design-system/` submodule на актуальном коммите main (`git submodule status`)
+- [ ] UI-компоненты сверены с `kino-design-system/kino-app/preview/*.html` — не выдуманы
 
-## Чеклист аудита
-
-### 1. СИНХРОНИЗАЦИЯ (SSOT → вторичные источники)
-
-- [ ] `automerge.yml` мержит `claude/**` и `cursor/**` напрямую в `main` (нет dev-стейджа)
-- [ ] `CLAUDE.md §Инфраструктура` совпадает с реальными workflow файлами
-- [ ] `CLAUDE.md §Рабочий процесс` отражает схему `claude/... → main`
-- [ ] Типы фильмов в Edge Functions соответствуют `src/lib/movieTypes.ts`
-- [ ] Логика Edge Functions соответствует декларациям `movieEngine.ts`
-
-### 2. ВНЕШНИЕ API И КЛИЕНТЫ
-
-- [ ] AI-ключи (ANTHROPIC, OPENAI, GOOGLE, DEEPSEEK) — только в Supabase Secrets
-- [ ] Rate limiting на AI Edge Functions — есть или нет (зафиксировать)
-- [ ] CORS ограничен: `https://kino-app.vercel.app`, не `*`
-
-### 3. ЧИСТОТА СЛОЁВ
-
-- [ ] `movieEngine.ts` содержит только логику, не UI
-- [ ] `movieTypes.ts` содержит только типы, не логику
-- [ ] Компоненты React не содержат прямых обращений к Supabase — через хуки/сервисы
-
-### 4. CI/CD
-
-- [ ] `automerge.yml` триггер ограничен `claude/**` и `cursor/**`
-- [ ] `automerge.yml` мержит в `main` (не в `dev`)
-- [ ] `promote.yml` существует и не тронут (назначение см. CLAUDE.md)
-- [ ] `deploy.yml` триггерится только на `supabase/functions/**`
-- [ ] При конфликте мержа — abort + exit 1
-- [ ] Нет `-X theirs`, нет force push в main
-
-### 5. ДОКУМЕНТАЦИЯ vs РЕАЛЬНОСТЬ
-
-- [ ] `CLAUDE.md §Инфраструктура` — описание совпадает с `automerge.yml`
-- [ ] `CLAUDE.md §Рабочий процесс` — указан `claude/... → main`
-- [ ] `CLAUDE.md §Среда Claude` — статусы актуальные
-- [ ] Все пути в `.md` реально существуют
-
-### 6. БЕЗОПАСНОСТЬ
-
-- [ ] Нет `service_role` ключа в `VITE_` переменных
-- [ ] `.env` не попал в историю git: `git log --all -- .env`
-- [ ] Каждая Edge Function верифицирует JWT → 401
-- [ ] RLS включён на каждой таблице, политики через `auth.uid()`
-- [ ] Входные данные валидируются через `zod`
-
-### 7. МЁРТВЫЙ КОД
-
-- [ ] Нет неиспользуемых Edge Functions в `supabase/functions/`
-- [ ] Нет устаревших workflow файлов
-
-### 8. ОБРАБОТКА ОШИБОК
-
-- [ ] Edge Functions — понятный HTTP-код при ошибке, не только 500
-- [ ] Frontend отображает ошибки пользователю
-- [ ] `automerge.yml` abort при конфликте
-
-### 9–12. Остальные разделы
-
-_См. темплейт AUDIT_PROMPT.md из `github.com/Arsid0305/TEMPLATE/docs/AUDIT_PROMPT.md` §§9–12._
-
----
+**API-ключи (в Supabase Secrets):**
+- [ ] `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `DEEPSEEK_API_KEY` — все существуют
+- [ ] `ALLOWED_ORIGINS` содержит `https://kino-app.vercel.app`
 
 ## Формат отчёта
 
-```
-SEVERITY: BLOCKER / HIGH / MEDIUM / LOW
-CONFIDENCE: HIGH / MEDIUM / LOW
-
-[СЕВЕРИТЕТ] [УВЕРЕННОСТЬ]
-Файл: path/to/file:line
-Проблема: ...
-Последствие: ...
-Фикс: ...
-```
-
-Завершить: Блокеры / Что сделано хорошо / Следующие 3 приоритета.
-
----
-
-## Вывод
-
-Отчёт одним markdown файлом.
+Как в `llm_wiki/wiki/audit-universal.md`.
