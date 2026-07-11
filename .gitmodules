@@ -1,0 +1,3 @@
+[submodule "kino-design-system"]
+	path = kino-design-system
+	url = https://github.com/Arsid0305/design-system

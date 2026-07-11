@@ -11,11 +11,19 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
 
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@2b81a2f4f21fc45c34bc5c4a24ddc2b31e2c34fe  # v1.1.1
         with:
           version: latest
+
+      - name: Verify ALLOWED_ORIGINS secret не пуст (защита от CORS-fallback)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SBP_ACCESS_TOKEN }}
+        run: |
+          if ! supabase secrets list --project-ref ovhwxfdtkzwxfomdlgjv | grep -q 'ALLOWED_ORIGINS'; then
+            echo "::warning::ALLOWED_ORIGINS not set — edge functions fallback to hardcoded whitelist"
+          fi
 
       - run: supabase functions deploy ai-chat --project-ref ovhwxfdtkzwxfomdlgjv
         env:

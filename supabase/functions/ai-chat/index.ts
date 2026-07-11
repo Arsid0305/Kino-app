@@ -1,9 +1,7 @@
 // ai-chat edge function — multi-provider: Claude / GPT-4o / Gemini / DeepSeek
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const DEFAULT_ALLOWED_HEADERS =
-  "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version";
+import { getCorsHeaders, isOriginAllowed } from "../_shared/cors.ts";
 const MAX_MESSAGES = 20;
 const MAX_MESSAGE_LENGTH = 2000;
 const MAX_TOTAL_MESSAGE_LENGTH = 12000;
@@ -186,24 +184,6 @@ function sanitizeTasteProfile(raw: string): string {
 }
 
 type ChatMessage = { role: "user" | "assistant"; content: string };
-
-function getAllowedOrigins(): string[] {
-  return (Deno.env.get("ALLOWED_ORIGINS") ?? "").split(",").map(o => o.trim()).filter(Boolean);
-}
-
-function isOriginAllowed(origin: string | null): boolean {
-  const allowed = getAllowedOrigins();
-  if (allowed.length === 0) return true;
-  if (!origin) return false;
-  return allowed.includes(origin);
-}
-
-function getCorsHeaders(origin: string | null) {
-  const allowed = getAllowedOrigins();
-  const allowOrigin = allowed.length === 0 ? "*"
-    : origin && allowed.includes(origin) ? origin : allowed[0];
-  return { "Access-Control-Allow-Origin": allowOrigin, "Access-Control-Allow-Headers": DEFAULT_ALLOWED_HEADERS };
-}
 
 function jsonResponse(origin: string | null, status: number, payload: Record<string, unknown>) {
   return new Response(JSON.stringify(payload), {
