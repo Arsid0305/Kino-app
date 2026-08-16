@@ -17,16 +17,22 @@
 .PARAMETER DryRun
   Всё проверить и собрать, но не публиковать.
 
+.PARAMETER Force
+  Переустановить зависимости, даже если package-lock.json не менялся.
+  Нужно, когда node_modules повреждён и сборка падает на ровном месте.
+
 .EXAMPLE
   .\scripts\deploy.ps1
   .\scripts\deploy.ps1 -Functions
+  .\scripts\deploy.ps1 -Force
 #>
 
 [CmdletBinding()]
 param(
     [switch]$SkipChecks,
     [switch]$Functions,
-    [switch]$DryRun
+    [switch]$DryRun,
+    [switch]$Force
 )
 
 $ErrorActionPreference = 'Stop'
@@ -69,10 +75,29 @@ $head = git log --oneline -1
 Write-Ok "HEAD: $head"
 
 Write-Step 'Зависимости'
-# npm ci быстрее и воспроизводимее, чем install, и не трогает package-lock.
-npm ci
-if ($LASTEXITCODE -ne 0) { Fail 'npm ci не прошёл' }
-Write-Ok 'зависимости установлены'
+# npm ci сносит node_modules и ставит всё заново — это полминуты на каждый
+# запуск, а нужно только когда реально менялся package-lock.json. Держим
+# рядом с установленными пакетами отпечаток lock-файла и сверяем с ним.
+$lockFile = 'package-lock.json'
+$stampFile = 'node_modules\.deploy-lock-hash'
+$lockHash = (Get-FileHash $lockFile -Algorithm SHA256).Hash
+$needInstall = $true
+
+if (-not $Force -and (Test-Path 'node_modules') -and (Test-Path $stampFile)) {
+    if ((Get-Content $stampFile -Raw).Trim() -eq $lockHash) { $needInstall = $false }
+}
+
+if ($needInstall) {
+    npm ci
+    if ($LASTEXITCODE -ne 0) { Fail 'npm ci не прошёл' }
+    Set-Content -Path $stampFile -Value $lockHash -NoNewline
+    Write-Ok 'зависимости установлены'
+} else {
+    Write-Ok 'зависимости не менялись, установка пропущена'
+}
+
+# -Force переустанавливает даже без изменений в lock-файле: нужно, когда
+# node_modules повреждён и сборка падает на ровном месте.
 
 if (-not $SkipChecks) {
     Write-Step 'Проверки'
