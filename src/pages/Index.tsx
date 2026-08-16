@@ -34,6 +34,7 @@ import {
   seedCloudLibrary,
   upsertDismissedMovie,
   upsertWatchedMovie,
+  upsertWatchedMovies,
   upsertWatchlistMovie,
   upsertWatchlistMovies,
 } from '@/lib/supabaseMovieStore';
@@ -177,10 +178,10 @@ const Index = () => {
 
     if (session) {
       try {
-        await Promise.all([
-          result.watched.length > 0 ? Promise.all(result.watched.map(movie => upsertWatchedMovie(movie))) : Promise.resolve(),
-          result.toWatch.length > 0 ? upsertWatchlistMovies(result.toWatch) : Promise.resolve(),
-        ]);
+        // Последовательно и пачками: параллельный импорт двух списков дерётся
+        // за один и тот же auth-лок supabase-js.
+        await upsertWatchedMovies(result.watched);
+        await upsertWatchlistMovies(result.toWatch);
         setSyncStatus('Импорт синхронизирован с Supabase');
       } catch (error) {
         console.error(error);
