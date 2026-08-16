@@ -25,7 +25,7 @@ import {
 } from '@/lib/movieTypes';
 import { getRecommendation } from '@/lib/movieEngine';
 import { MOVIE_DATABASE } from '@/lib/movieData';
-import { getMovieDedupKey, mergeUniqueMovies } from '@/lib/movieIdentity';
+import { getMovieDedupKey, mergeUniqueMovies, reconcileImportedTypes } from '@/lib/movieIdentity';
 import { localizeReason } from '@/lib/localizeReason';
 import { supabase } from '@/integrations/supabase/client';
 import {
@@ -164,14 +164,20 @@ const Index = () => {
     let nextWatched = watched;
     let nextWatchlist = customMovies;
 
-    if (result.watched.length > 0) {
-      nextWatched = mergeUniqueMovies(watched, result.watched);
+    // Тип из файла подгоняем под уже сохранённый: иначе тот же фильм с другим
+    // типом не опознаётся при дедупликации и уезжает второй копией.
+    const library = [...watched, ...customMovies, ...dismissedMovies];
+    const importedWatched = reconcileImportedTypes(result.watched, library);
+    const importedToWatch = reconcileImportedTypes(result.toWatch, library);
+
+    if (importedWatched.length > 0) {
+      nextWatched = mergeUniqueMovies(watched, importedWatched);
       setWatched(nextWatched);
       localStorage.setItem('cinema-watched', JSON.stringify(nextWatched));
     }
 
-    if (result.toWatch.length > 0) {
-      nextWatchlist = mergeUniqueMovies(customMovies, result.toWatch);
+    if (importedToWatch.length > 0) {
+      nextWatchlist = mergeUniqueMovies(customMovies, importedToWatch);
       setCustomMovies(nextWatchlist);
       localStorage.setItem('cinema-custom-movies', JSON.stringify(nextWatchlist));
     }
@@ -180,8 +186,8 @@ const Index = () => {
       try {
         // Последовательно и пачками: параллельный импорт двух списков дерётся
         // за один и тот же auth-лок supabase-js.
-        await upsertWatchedMovies(result.watched);
-        await upsertWatchlistMovies(result.toWatch);
+        await upsertWatchedMovies(importedWatched);
+        await upsertWatchlistMovies(importedToWatch);
         setSyncStatus('Импорт синхронизирован с Supabase');
       } catch (error) {
         console.error(error);
