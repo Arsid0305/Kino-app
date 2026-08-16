@@ -34,8 +34,10 @@ async function checkRateLimit(key: string): Promise<boolean> {
     p_window_ms: 60000,
   });
   if (error) {
+    // Fail-closed: раньше отказ таблицы снимал лимит на платные LLM-вызовы.
+    // Теперь один упавший запрос лучше, чем открытая двери на списание квоты.
     console.error("Rate limit DB error:", error);
-    return true;
+    return false;
   }
   return data as boolean;
 }

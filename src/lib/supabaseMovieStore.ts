@@ -156,8 +156,8 @@ async function upsertMoviesBatch(
 }
 
 // Читаем всю библиотеку постранично. Раньше стоял .limit(500) — библиотека
-// на 1000+ записей молча обрезалась, и на устройстве без локального кеша
-// часть фильмов просто не появлялась.
+// на 1000+ записей молча обрезалась. Теперь при упоре в потолок бросаем
+// ошибку, а не режем список молча — тот же класс бага не должен повториться.
 const PAGE_SIZE = 500;
 const MAX_PAGES = 40;
 
@@ -177,10 +177,12 @@ async function fetchAllUserMovieRows(): Promise<UserMovieRow[]> {
 
     const batch = data ?? [];
     rows.push(...batch);
-    if (batch.length < PAGE_SIZE) break;
+    if (batch.length < PAGE_SIZE) return rows;
   }
 
-  return rows;
+  throw new Error(
+    `Библиотека превысила ${MAX_PAGES * PAGE_SIZE} записей. Проверьте на дубли или увеличьте MAX_PAGES.`
+  );
 }
 
 export async function loadCloudLibrary(): Promise<CloudLibrary> {
