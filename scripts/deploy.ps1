@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Ручной деплой Kino-app, пока GitHub Actions заблокированы флагом T&S.
 
