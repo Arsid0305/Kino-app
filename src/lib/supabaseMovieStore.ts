@@ -155,20 +155,42 @@ async function upsertMoviesBatch(
   await removeFromCloudLists(movies.map(getMovieDedupKey), clearFrom, userId);
 }
 
-export async function loadCloudLibrary(): Promise<CloudLibrary> {
-  const { data, error } = await supabase
-    .from('user_movies')
-    .select('*')
-    .order('updated_at', { ascending: false })
-    .limit(500);
+// Читаем всю библиотеку постранично. Раньше стоял .limit(500) — библиотека
+// на 1000+ записей молча обрезалась, и на устройстве без локального кеша
+// часть фильмов просто не появлялась.
+const PAGE_SIZE = 500;
+const MAX_PAGES = 40;
 
-  if (error) throw error;
+async function fetchAllUserMovieRows(): Promise<UserMovieRow[]> {
+  const rows: UserMovieRow[] = [];
+
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const from = page * PAGE_SIZE;
+    const { data, error } = await supabase
+      .from('user_movies')
+      .select('*')
+      .order('updated_at', { ascending: false })
+      .order('movie_key', { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (error) throw error;
+
+    const batch = data ?? [];
+    rows.push(...batch);
+    if (batch.length < PAGE_SIZE) break;
+  }
+
+  return rows;
+}
+
+export async function loadCloudLibrary(): Promise<CloudLibrary> {
+  const data = await fetchAllUserMovieRows();
 
   const watched: WatchedMovie[] = [];
   const watchlist: Movie[] = [];
   const dismissed: Movie[] = [];
 
-  for (const row of data ?? []) {
+  for (const row of data) {
     const movie = hydrateMovie(row);
     if (row.list_type === 'watched') watched.push(movie as WatchedMovie);
     else if (row.list_type === 'watchlist') watchlist.push(movie as Movie);
