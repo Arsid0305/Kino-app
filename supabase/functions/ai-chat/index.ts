@@ -43,7 +43,10 @@ async function callOpenAICompat(
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`${baseUrl} ${res.status}: ${await res.text()}`);
+  if (!res.ok) {
+    console.error(`${baseUrl} ${res.status}: ${(await res.text()).slice(0, 500)}`);
+    throw new Error(`Провайдер ответил ошибкой ${res.status}`);
+  }
   const d = await res.json() as { choices?: { message?: { content?: string } }[] };
   return d.choices?.[0]?.message?.content?.trim() ?? "";
 }
@@ -68,7 +71,10 @@ async function callClaude(
       messages,
     }),
   });
-  if (!res.ok) throw new Error(`Anthropic ${res.status}: ${await res.text()}`);
+  if (!res.ok) {
+    console.error(`Anthropic ${res.status}: ${(await res.text()).slice(0, 500)}`);
+    throw new Error(`Провайдер ответил ошибкой ${res.status}`);
+  }
   const d = await res.json() as { content?: { type: string; text: string }[] };
   return d.content?.[0]?.text?.trim() ?? "";
 }
@@ -112,7 +118,8 @@ async function callGemini(
       const parts = d.candidates?.[0]?.content?.parts ?? [];
       return parts.filter((p: { thought?: boolean }) => !p.thought).map((p: { text?: string }) => p.text ?? "").join("").trim();
     }
-    lastError = `Gemini ${res.status}: ${await res.text()}`;
+    console.error(`Gemini ${res.status}: ${(await res.text()).slice(0, 500)}`);
+    lastError = `Провайдер ответил ошибкой ${res.status}`;
     if (res.status !== 503 && res.status !== 429) break;
   }
   throw new Error(lastError || "Gemini: все попытки исчерпаны");
@@ -479,6 +486,7 @@ ${tasteProfile || "еще формируется"}
 
   } catch (error) {
     console.error("Ошибка ai-chat:", error);
-    return jsonResponse(origin, 500, { error: error instanceof Error ? error.message : "Неизвестная ошибка" });
+    // Наружу — обобщённо: детали провайдера остаются в логах функции.
+    return jsonResponse(origin, 500, { error: "Не удалось получить ответ. Попробуйте ещё раз." });
   }
 });
