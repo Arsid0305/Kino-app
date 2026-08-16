@@ -36,6 +36,15 @@ function Write-Step($text) { Write-Host "`n=== $text ===" -ForegroundColor Cyan 
 function Write-Ok($text)   { Write-Host "  OK  $text" -ForegroundColor Green }
 function Fail($text)       { Write-Host "`nОСТАНОВ: $text" -ForegroundColor Red; exit 1 }
 
+# git и npm пишут UTF-8, а консоль по умолчанию читает их в cp866 —
+# русский текст в выводе (сообщения коммитов, ошибки) превращался в кракозябры.
+try {
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    $OutputEncoding = [System.Text.Encoding]::UTF8
+} catch {
+    # Не в интерактивной консоли — не беда, на сам деплой не влияет.
+}
+
 # Работаем от корня репозитория, а не от папки, где лежит скрипт.
 $repoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $repoRoot
