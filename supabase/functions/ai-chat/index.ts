@@ -7,7 +7,7 @@ const MAX_MESSAGE_LENGTH = 2000;
 const MAX_TOTAL_MESSAGE_LENGTH = 12000;
 const MAX_MOVIES = 30;
 const MAX_REQUESTS_PER_MINUTE = 10;
-const DEFAULT_DEEPSEEK_MODEL = "deepseek-chat";
+const DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-flash";
 const DEFAULT_OPENAI_MODEL = "gpt-4o";
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
 const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6";
@@ -277,7 +277,7 @@ serve(async req => {
     if (totalLen > MAX_TOTAL_MESSAGE_LENGTH) return jsonResponse(origin, 400, { error: "Диалог слишком длинный" });
 
     const provider: Provider = (["claude", "gpt4o", "gemini", "deepseek"] as const).includes(body.provider as Provider)
-      ? (body.provider as Provider) : "claude";
+      ? (body.provider as Provider) : "gpt4o";
     const mode: "chat" | "title_lookup" = body.mode === "title_lookup" ? "title_lookup" : "chat";
 
     const filters = Array.isArray(body.filters) ? body.filters.map(String).slice(0, 12) : [];
