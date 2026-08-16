@@ -137,7 +137,10 @@ export const AiAdvisor = ({
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [provider, setProvider] = useState<Provider>(() => {
     const saved = localStorage.getItem('kino-ai-provider');
-    return (PROVIDERS.some(p => p.id === saved) ? saved : 'claude') as Provider;
+    // Дефолт держим на живом провайдере: Anthropic-организация закрыта, и чат
+    // на чистом браузере падал бы с «ANTHROPIC_API_KEY не настроен». Claude
+    // остаётся в списке — выбор сохраняется и заработает, если доступ вернётся.
+    return (PROVIDERS.some(p => p.id === saved) ? saved : 'gpt4o') as Provider;
   });
   const scrollRef = useRef<HTMLDivElement>(null);
 
