@@ -98,34 +98,99 @@ async function getCurrentUserId() {
   return data.user.id;
 }
 
-export async function removeFromCloudLists(movieKey: string, listTypes: CloudMovieListType[]) {
-  if (listTypes.length === 0) return;
+// Массовые операции режем на пачки: один upsert на 200 строк упирается в лимит размера
+// запроса, а delete со всеми ключами разом — в лимит длины URL у PostgREST.
+const BATCH_SIZE = 100;
+
+function chunk<T>(items: T[], size = BATCH_SIZE): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size));
+  return chunks;
+}
+
+export async function removeFromCloudLists(
+  movieKeys: string | string[],
+  listTypes: CloudMovieListType[],
+  knownUserId?: string,
+) {
+  const keys = Array.isArray(movieKeys) ? movieKeys : [movieKeys];
+  if (listTypes.length === 0 || keys.length === 0) return;
+
+  const userId = knownUserId ?? await getCurrentUserId();
+
+  for (const batch of chunk(keys)) {
+    const { error } = await supabase
+      .from('user_movies')
+      .delete()
+      .eq('user_id', userId)
+      .in('movie_key', batch)
+      .in('list_type', listTypes);
+
+    if (error) throw error;
+  }
+}
+
+// Общий путь для массового импорта: userId берём один раз, строки пишем пачками.
+// Раньше каждый фильм шёл отдельным upsertX(), а тот дважды звал supabase.auth.getUser() —
+// на 200 фильмах это 400 конкурентов за Web Lock 'lock:sb-<ref>-auth-token', и браузер
+// начинал ругаться «Lock was released because another request stole it».
+async function upsertMoviesBatch(
+  movies: (Movie | WatchedMovie)[],
+  listType: CloudMovieListType,
+  clearFrom: CloudMovieListType[],
+) {
+  if (movies.length === 0) return;
 
   const userId = await getCurrentUserId();
-  const { error } = await supabase
-    .from('user_movies')
-    .delete()
-    .eq('user_id', userId)
-    .eq('movie_key', movieKey)
-    .in('list_type', listTypes);
 
-  if (error) throw error;
+  for (const batch of chunk(movies)) {
+    const payload = batch.map(movie => ({ ...toRow(movie, listType), user_id: userId }));
+    const { error } = await supabase
+      .from('user_movies')
+      .upsert(payload, { onConflict: 'user_id,movie_key,list_type' });
+
+    if (error) throw error;
+  }
+
+  await removeFromCloudLists(movies.map(getMovieDedupKey), clearFrom, userId);
+}
+
+// Читаем всю библиотеку постранично. Раньше стоял .limit(500) — библиотека
+// на 1000+ записей молча обрезалась, и на устройстве без локального кеша
+// часть фильмов просто не появлялась.
+const PAGE_SIZE = 500;
+const MAX_PAGES = 40;
+
+async function fetchAllUserMovieRows(): Promise<UserMovieRow[]> {
+  const rows: UserMovieRow[] = [];
+
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const from = page * PAGE_SIZE;
+    const { data, error } = await supabase
+      .from('user_movies')
+      .select('*')
+      .order('updated_at', { ascending: false })
+      .order('movie_key', { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (error) throw error;
+
+    const batch = data ?? [];
+    rows.push(...batch);
+    if (batch.length < PAGE_SIZE) break;
+  }
+
+  return rows;
 }
 
 export async function loadCloudLibrary(): Promise<CloudLibrary> {
-  const { data, error } = await supabase
-    .from('user_movies')
-    .select('*')
-    .order('updated_at', { ascending: false })
-    .limit(500);
-
-  if (error) throw error;
+  const data = await fetchAllUserMovieRows();
 
   const watched: WatchedMovie[] = [];
   const watchlist: Movie[] = [];
   const dismissed: Movie[] = [];
 
-  for (const row of data ?? []) {
+  for (const row of data) {
     const movie = hydrateMovie(row);
     if (row.list_type === 'watched') watched.push(movie as WatchedMovie);
     else if (row.list_type === 'watchlist') watchlist.push(movie as Movie);
@@ -150,9 +215,11 @@ export async function upsertWatchlistMovie(movie: Movie) {
 }
 
 export async function upsertWatchlistMovies(movies: Movie[]) {
-  if (movies.length === 0) return;
+  await upsertMoviesBatch(movies, 'watchlist', ['dismissed']);
+}
 
-  await Promise.all(movies.map(movie => upsertWatchlistMovie(movie)));
+export async function upsertWatchedMovies(movies: WatchedMovie[]) {
+  await upsertMoviesBatch(movies, 'watched', ['watchlist', 'dismissed']);
 }
 
 export async function upsertDismissedMovie(movie: Movie) {
@@ -193,9 +260,11 @@ export async function seedCloudLibrary(watched: WatchedMovie[], watchlist: Movie
 
   if (payload.length === 0) return;
 
-  const { error } = await supabase
-    .from('user_movies')
-    .upsert(payload, { onConflict: 'user_id,movie_key,list_type' });
+  for (const batch of chunk(payload)) {
+    const { error } = await supabase
+      .from('user_movies')
+      .upsert(batch, { onConflict: 'user_id,movie_key,list_type' });
 
-  if (error) throw error;
+    if (error) throw error;
+  }
 }
