@@ -1,9 +1,18 @@
 // CORS helpers для Edge Functions — общий модуль для ai-chat и movie-recommendation.
-// Fallback whitelist используется если secret ALLOWED_ORIGINS не задан (защита от
-// ротации секретов, при которой пустой список ранее приводил к '*' — CSRF-риск).
+//
+// Whitelist берётся из секрета ALLOWED_ORIGINS. Если секрет пропал (ротация,
+// опечатка), используется FALLBACK_ORIGINS: реальные домены проекта в Vercel —
+// иначе фронт получит 403 в момент, когда страховка должна была спасти.
+//
+// localhost разрешён только когда явно включён флаг ALLOW_LOCALHOST_CORS=1.
+// Раньше он был разрешён всегда — то есть в проде тоже, и любое локально
+// запущенное приложение могло звать production-функции (JWT оставался, но
+// CORS-барьера не было).
 
 const FALLBACK_ORIGINS = [
-  "https://kino-app.vercel.app",
+  "https://kino-arsid.vercel.app",
+  "https://kino-app-arsid.vercel.app",
+  "https://kino-app-git-main-arsid.vercel.app",
 ];
 const LOCALHOST_RE = /^http:\/\/localhost(?::\d+)?$/;
 
@@ -18,19 +27,24 @@ export function getAllowedOrigins(): string[] {
   return fromSecret.length > 0 ? fromSecret : FALLBACK_ORIGINS;
 }
 
+function isLocalhostAllowed(): boolean {
+  return Deno.env.get("ALLOW_LOCALHOST_CORS") === "1";
+}
+
 export function isOriginAllowed(origin: string | null): boolean {
   if (!origin) return false;
   const allowed = getAllowedOrigins();
-  return allowed.includes(origin) || LOCALHOST_RE.test(origin);
+  if (allowed.includes(origin)) return true;
+  return isLocalhostAllowed() && LOCALHOST_RE.test(origin);
 }
 
 export function getCorsHeaders(origin: string | null): Record<string, string> {
-  const allowed = getAllowedOrigins();
-  const allowOrigin = origin && (allowed.includes(origin) || LOCALHOST_RE.test(origin))
-    ? origin
-    : allowed[0];
+  const allowOrigin = isOriginAllowed(origin) ? origin! : getAllowedOrigins()[0];
   return {
     "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Headers": DEFAULT_ALLOWED_HEADERS,
+    // Vary: Origin — ответ зависит от заголовка запроса, иначе кэш может
+    // отдать чужому origin наш Allow-Origin.
+    "Vary": "Origin",
   };
 }
