@@ -416,7 +416,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background pb-24">
-      <div ref={headerRef} className="sticky top-0 z-40 glass-surface border-b border-border">
+      <div ref={headerRef} className="sticky top-0 z-40 glass-surface border-b border-border safe-sticky-top">
         <div className="max-w-md mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-primary/15 flex items-center justify-center">

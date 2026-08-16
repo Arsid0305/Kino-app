@@ -63,8 +63,9 @@
     font-family: 'Inter', sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    /* iOS safe area */
-    padding-top: env(safe-area-inset-top);
+    /* Сверху отступ не здесь: липкая шапка прилипает к краю окна, а не к
+       границе контента, и при скролле уезжала под часы и значки iOS.
+       Отступ держит сама шапка — см. .safe-sticky-top. */
     padding-bottom: env(safe-area-inset-bottom);
   }
 
@@ -88,5 +89,10 @@
   }
   .safe-top {
     padding-top: max(0.75rem, env(safe-area-inset-top));
+  }
+  /* Для липкой шапки: сама шапка уходит под статус-бар и подкладывает туда
+     свой фон, а содержимое отодвигается ровно на его высоту. */
+  .safe-sticky-top {
+    padding-top: env(safe-area-inset-top);
   }
 }
