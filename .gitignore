@@ -29,6 +29,13 @@ dist-ssr
 # Supabase
 supabase/.temp/
 
+# Vercel
+# CLI создаёт .vercel/project.json при линковке и, если этих строк нет,
+# дописывает их в .gitignore сам — рабочая копия становится грязной,
+# и следующий запуск scripts/deploy.ps1 останавливается на проверке.
+.vercel
+.env*.local
+
 # Cache
 .cache
 .turbo
