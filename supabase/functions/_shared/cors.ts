@@ -7,7 +7,10 @@ const FALLBACK_ORIGINS = [
 ];
 const LOCALHOST_RE = /^http:\/\/localhost(?::\d+)?$/;
 
-export const DEFAULT_ALLOWED_HEADERS = "authorization, x-client-info, apikey, content-type";
+export const DEFAULT_ALLOWED_HEADERS =
+  "authorization, x-client-info, apikey, content-type, " +
+  "x-supabase-client-platform, x-supabase-client-platform-version, " +
+  "x-supabase-client-runtime, x-supabase-client-runtime-version";
 
 export function getAllowedOrigins(): string[] {
   const fromSecret = (Deno.env.get("ALLOWED_ORIGINS") ?? "")
