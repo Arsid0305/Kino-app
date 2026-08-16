@@ -5,6 +5,7 @@ import { getCorsHeaders, isOriginAllowed } from "../_shared/cors.ts";
 const MAX_REQUESTS_PER_MINUTE = 10;
 const MAX_MOVIES = 80;
 const DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-flash";
+const DEFAULT_OPENAI_MODEL = "gpt-4o-mini";
 
 // Admin client for rate limiting — uses service role key, persists across cold starts
 const supabaseAdmin = createClient(
@@ -103,8 +104,12 @@ serve(async req => {
     const dismissedMovies = Array.isArray(body.dismissedMovies)
       ? body.dismissedMovies.filter(isMovieContext).slice(0, MAX_MOVIES) : [];
 
+    // Хватает любого из двух ключей: DeepSeek основной, OpenAI подстраховывает.
     const DEEPSEEK_API_KEY = Deno.env.get("DEEPSEEK_API_KEY");
-    if (!DEEPSEEK_API_KEY) throw new Error("DEEPSEEK_API_KEY не настроен");
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    if (!DEEPSEEK_API_KEY && !OPENAI_API_KEY) {
+      throw new Error("Не настроен ни DEEPSEEK_API_KEY, ни OPENAI_API_KEY");
+    }
     const DEEPSEEK_MODEL = Deno.env.get("DEEPSEEK_MODEL") ?? DEFAULT_DEEPSEEK_MODEL;
 
     const watchedTitles = titlesOf(watchedMovies.slice(0, 40));
@@ -121,12 +126,16 @@ serve(async req => {
         .filter(Boolean)
     );
 
-    const callForTwo = async (): Promise<Record<string, unknown>[]> => {
+    const buildBody = (model: string, useCompletionTokens: boolean) => {
+      const tokenParam = useCompletionTokens
+        ? { max_completion_tokens: 1600 }
+        : { max_tokens: 1600, temperature: 1.2 };
+
       const forbidden = [watchedTitles, watchlistTitles, dismissedTitles]
         .filter(Boolean).join(", ");
 
-      const msgBody = JSON.stringify({
-        model: DEEPSEEK_MODEL,
+      return JSON.stringify({
+        model,
         response_format: { type: "json_object" },
         messages: [
           {
@@ -139,21 +148,35 @@ serve(async req => {
           },
         ],
         stream: false,
-        max_tokens: 1600,
-        temperature: 1.2,
+        ...tokenParam,
       });
+    };
+
+    // Один провайдер = одна точка отказа: когда DeepSeek снял deepseek-chat
+    // 24 июля, подбор фильмов молча лежал больше месяца, потому что заменить
+    // его было нечем. Теперь при отказе пробуем OpenAI тем же промптом.
+    const callProvider = async (
+      label: string,
+      apiKey: string,
+      baseUrl: string,
+      model: string,
+      useCompletionTokens: boolean,
+    ): Promise<Record<string, unknown>[]> => {
+      const body = buildBody(model, useCompletionTokens);
 
       for (let attempt = 0; attempt < 3; attempt++) {
         if (attempt > 0) await new Promise(r => setTimeout(r, 1000 * attempt));
-        const res = await fetch("https://api.deepseek.com/chat/completions", {
+        const res = await fetch(`${baseUrl}/chat/completions`, {
           method: "POST",
-          headers: { Authorization: `Bearer ${DEEPSEEK_API_KEY}`, "Content-Type": "application/json" },
-          body: msgBody,
+          headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+          body,
         });
 
         if (!res.ok) {
-          if (res.status === 429) throw new Error("DeepSeek 429");
-          if (attempt === 2) throw new Error(`DeepSeek ${res.status}`);
+          // Тело ответа — только в лог: там бывают идентификаторы организации и квоты.
+          console.error(`${label} ${res.status}: ${(await res.text()).slice(0, 500)}`);
+          if (res.status === 429) throw new Error(`${label} 429`);
+          if (attempt === 2) throw new Error(`${label} ${res.status}`);
           continue;
         }
 
@@ -167,10 +190,28 @@ serve(async req => {
             : [parsed];
           return arr;
         } catch {
-          if (attempt === 2) throw new Error(`Ошибка разбора JSON: ${clean.slice(0, 100)}`);
+          console.error(`${label}: ответ не разобрался как JSON: ${clean.slice(0, 200)}`);
+          if (attempt === 2) throw new Error(`${label}: ответ не является валидным JSON`);
         }
       }
-      throw new Error("Все попытки запроса исчерпаны");
+      throw new Error(`${label}: все попытки запроса исчерпаны`);
+    };
+
+    const callOpenAI = () => {
+      const model = Deno.env.get("OPENAI_RECOMMENDATION_MODEL") ?? DEFAULT_OPENAI_MODEL;
+      return callProvider("OpenAI", OPENAI_API_KEY!, "https://api.openai.com/v1", model, true);
+    };
+
+    const callForTwo = async (): Promise<Record<string, unknown>[]> => {
+      if (!DEEPSEEK_API_KEY) return callOpenAI();
+
+      try {
+        return await callProvider("DeepSeek", DEEPSEEK_API_KEY, "https://api.deepseek.com", DEEPSEEK_MODEL, false);
+      } catch (deepseekError) {
+        if (!OPENAI_API_KEY) throw deepseekError;
+        console.error("DeepSeek недоступен, переключаюсь на OpenAI:", deepseekError);
+        return callOpenAI();
+      }
     };
 
     const rawResults = await callForTwo();
@@ -187,7 +228,9 @@ serve(async req => {
     return jsonResponse(origin, 200, { recommendations: picked });
 
   } catch (error) {
+    // Наружу — обобщённо. Сообщения от провайдеров содержат идентификаторы
+    // организации, тип ключа и остатки квоты; им не место у клиента.
     console.error("Ошибка movie-recommendation:", error);
-    return jsonResponse(origin, 500, { error: error instanceof Error ? error.message : "Неизвестная ошибка" });
+    return jsonResponse(origin, 500, { error: "Не удалось получить рекомендации. Попробуйте ещё раз." });
   }
 });
