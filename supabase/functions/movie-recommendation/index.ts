@@ -4,7 +4,7 @@ import { getCorsHeaders, isOriginAllowed } from "../_shared/cors.ts";
 
 const MAX_REQUESTS_PER_MINUTE = 10;
 const MAX_MOVIES = 80;
-const DEFAULT_DEEPSEEK_MODEL = "deepseek-chat";
+const DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-flash";
 
 // Admin client for rate limiting — uses service role key, persists across cold starts
 const supabaseAdmin = createClient(
