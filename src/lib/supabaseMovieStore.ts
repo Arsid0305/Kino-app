@@ -252,21 +252,3 @@ export async function upsertWatchedMovie(movie: WatchedMovie) {
   await removeFromCloudLists(movieKey, ['watchlist', 'dismissed']);
 }
 
-export async function seedCloudLibrary(watched: WatchedMovie[], watchlist: Movie[], dismissed: Movie[] = []) {
-  const userId = await getCurrentUserId();
-  const payload = [
-    ...watched.map(movie => ({ ...toRow(movie, 'watched'), user_id: userId })),
-    ...watchlist.map(movie => ({ ...toRow(movie, 'watchlist'), user_id: userId })),
-    ...dismissed.map(movie => ({ ...toRow(movie, 'dismissed'), user_id: userId })),
-  ];
-
-  if (payload.length === 0) return;
-
-  for (const batch of chunk(payload)) {
-    const { error } = await supabase
-      .from('user_movies')
-      .upsert(batch, { onConflict: 'user_id,movie_key,list_type' });
-
-    if (error) throw error;
-  }
-}
