@@ -31,7 +31,6 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   loadCloudLibrary,
   removeFromCloudLists,
-  seedCloudLibrary,
   upsertDismissedMovie,
   upsertWatchedMovie,
   upsertWatchedMovies,
@@ -88,13 +87,6 @@ const Index = () => {
     return () => data.subscription.unsubscribe();
   }, []);
 
-  const watchedRef = useRef(watched);
-  watchedRef.current = watched;
-  const customMoviesRef = useRef(customMovies);
-  customMoviesRef.current = customMovies;
-  const dismissedMoviesRef = useRef(dismissedMovies);
-  dismissedMoviesRef.current = dismissedMovies;
-
   useEffect(() => {
     let cancelled = false;
 
@@ -107,39 +99,22 @@ const Index = () => {
       setSyncStatus('Синхронизируем с облаком...');
 
       try {
+        // Облако — источник правды. Локальный кеш только для быстрого показа
+        // до загрузки облака; заливать локальное обратно нельзя, иначе
+        // удалённое на одном устройстве воскресает на другом.
+        // Явное добавление / оценка / отклонение пишут в облако через
+        // supabaseMovieStore и обновляют локальный кеш сами.
         const cloudLibrary = await loadCloudLibrary();
         if (cancelled) return;
 
-        const hasCloudData =
-          cloudLibrary.watched.length > 0 ||
-          cloudLibrary.watchlist.length > 0 ||
-          cloudLibrary.dismissed.length > 0;
-        if (hasCloudData) {
-          const mergedWatched = mergeUniqueMovies(cloudLibrary.watched, watchedRef.current);
-          const mergedWatchlist = mergeUniqueMovies(cloudLibrary.watchlist, customMoviesRef.current);
-          const mergedDismissed = mergeUniqueMovies(cloudLibrary.dismissed, dismissedMoviesRef.current);
-          if (cancelled) return;
-          setWatched(mergedWatched);
-          setCustomMovies(mergedWatchlist);
-          setDismissedMovies(mergedDismissed);
-          localStorage.setItem('cinema-watched', JSON.stringify(mergedWatched));
-          localStorage.setItem('cinema-custom-movies', JSON.stringify(mergedWatchlist));
-          localStorage.setItem('cinema-dismissed-movies', JSON.stringify(mergedDismissed));
+        setWatched(cloudLibrary.watched);
+        setCustomMovies(cloudLibrary.watchlist);
+        setDismissedMovies(cloudLibrary.dismissed);
+        localStorage.setItem('cinema-watched', JSON.stringify(cloudLibrary.watched));
+        localStorage.setItem('cinema-custom-movies', JSON.stringify(cloudLibrary.watchlist));
+        localStorage.setItem('cinema-dismissed-movies', JSON.stringify(cloudLibrary.dismissed));
 
-          const localOnlyWatched = mergedWatched.filter(m => !cloudLibrary.watched.some(c => getMovieDedupKey(c) === getMovieDedupKey(m)));
-          const localOnlyWatchlist = mergedWatchlist.filter(m => !cloudLibrary.watchlist.some(c => getMovieDedupKey(c) === getMovieDedupKey(m)));
-          const localOnlyDismissed = mergedDismissed.filter(m => !cloudLibrary.dismissed.some(c => getMovieDedupKey(c) === getMovieDedupKey(m)));
-          if (localOnlyWatched.length + localOnlyWatchlist.length + localOnlyDismissed.length > 0) {
-            await seedCloudLibrary(localOnlyWatched, localOnlyWatchlist, localOnlyDismissed);
-          }
-          if (cancelled) return;
-          setSyncStatus('Синхронизировано с Supabase');
-          return;
-        }
-
-        await seedCloudLibrary(watchedRef.current, customMoviesRef.current, dismissedMoviesRef.current);
-        if (cancelled) return;
-        setSyncStatus('Локальная база загружена в Supabase');
+        setSyncStatus('Синхронизировано с Supabase');
       } catch (error) {
         if (cancelled) return;
         console.error(error);
@@ -153,7 +128,6 @@ const Index = () => {
     return () => {
       cancelled = true;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
   const updateFilter = (key: keyof FilterState) => (value: string | null) => {
