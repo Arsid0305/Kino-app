@@ -6,7 +6,11 @@
 
 ## 🚨 TEMPORARY — GitHub Actions заблокированы (пока T&S не снимет флаг)
 
+_Активен с: июль 2026. Последняя проверка: 2026-08-19._
+
 Аккаунт `Arsid0305` помечен suspicious, GitHub Actions отключены на уровне account. Тикет #4535795 в работе с июля 2026.
+
+**Как убедиться что блок ещё актуален** (быстрая проверка в начале сессии): `mcp__github__actions_list` для `Arsid0305/Kino-app` → если `total_count: 0` за последние 24 часа, блок ещё актуален. Если пошли runs — снимать блок и восстановить обычный автоматизированный workflow.
 
 **Что НЕ работает пока флаг активен:**
 - `automerge.yml` — не срабатывает
@@ -168,11 +172,13 @@ Submodule `kino-design-system/` → `github.com/Arsid0305/design-system`. Ини
 
 ## Инфраструктура
 
-- Vercel — фронтенд, автодеплой при пуше в `main`
-- Supabase — БД, Auth, Edge Functions (`ai-chat`, `movie-recommendation`), проект `ovhwxfdtkzwxfomdlgjv`
-- GitHub Actions:
-  - `automerge.yml` — PR `claude/**` / `cursor/**` → main через API (squash + deleteRef)
-  - `deploy.yml` — деплой Edge Functions при изменении `supabase/functions/**`
+_Проверено: 2026-08-19._
+
+- Vercel — фронтенд. **Автодеплой мёртв с 26.06.2026** (GitHub-интеграция отвалилась вместе с T&S-флагом). Деплой только ручной: `scripts/deploy.ps1` из отдельного клона (см. TEMPORARY-блок в начале файла).
+- Supabase — БД, Auth, Edge Functions (`ai-chat`, `movie-recommendation`), проект `ovhwxfdtkzwxfomdlgjv`. Деплой edge functions — вручную через Supabase MCP (`deploy_edge_function`) после мержа.
+- GitHub Actions — **фактически не работают** пока активен T&S-флаг. Файлы workflow сохранены, автоматически включатся когда флаг снимут:
+  - `automerge.yml` — PR `claude/**` / `cursor/**` → main через API (squash + deleteRef). Сейчас мерж через `mcp__github__merge_pull_request`.
+  - `deploy.yml` — деплой Edge Functions при изменении `supabase/functions/**`. Сейчас через Supabase MCP.
 
 API-ключи в Supabase Secrets: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `DEEPSEEK_API_KEY`, `ALLOWED_ORIGINS`.
 
