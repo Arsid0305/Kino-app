@@ -1,6 +1,7 @@
 # Claude Adapter — Kino-app
 
-> Тонкий адаптер. Универсальные правила — в `arsid0305/ai_os/SYSTEM.md` и `llm_wiki/wiki/*`.
+> Тонкий адаптер. Универсальные правила экосистемы — в `docs/rules/core/*.md` (синкается из AI_OS SSOT).
+> Специфика Kino-app — в `docs/rules/scoped/kino-app-specific.md`.
 
 ---
 
@@ -102,17 +103,26 @@ git pull origin main
 
 ---
 
-## Каноны (не дублировать)
+## Каноны (rules как атомы)
 
-- Стиль общения / краткость — `AI_OS/SYSTEM.md §4`
-- Git flow, запрет флагов, редактирование — `AI_OS/SYSTEM.md §10`
-- Начало / конец сессии — `AI_OS/SYSTEM.md §8`
-- BIG / SMALL классификация — `AI_OS/SYSTEM.md §3`
-- Subagents — `AI_OS/CLAUDE.md`
+Универсальные правила — в `docs/rules/core/*.md` (SSOT в AI_OS, синкается автоматически):
+
+- Начало / конец сессии — [`docs/rules/core/session-lifecycle.md`](docs/rules/core/session-lifecycle.md)
+- Стиль общения / краткость — [`docs/rules/core/communication-style.md`](docs/rules/core/communication-style.md)
+- Git flow, запрет флагов, редактирование — [`docs/rules/core/git-flow.md`](docs/rules/core/git-flow.md)
+- GitHub anti-abuse — [`docs/rules/core/github-anti-abuse.md`](docs/rules/core/github-anti-abuse.md)
+- BIG / SMALL классификация — [`docs/rules/core/task-classification.md`](docs/rules/core/task-classification.md)
+- Принципы работы с кодом — [`docs/rules/core/code-principles.md`](docs/rules/core/code-principles.md)
+- Subagents (worktree, JSON-schema контракты) — [`docs/rules/core/subagents.md`](docs/rules/core/subagents.md)
+- Audit-триггер — [`docs/rules/core/audit-trigger.md`](docs/rules/core/audit-trigger.md)
 - Выбор модели `haiku`/`sonnet`/`opus` — `llm_wiki/wiki/workflow.md`
 - Context Mode — `llm_wiki/wiki/context-mode.md`
 - Универсальный audit-canon — `llm_wiki/wiki/audit-universal.md`
 - Проектный audit-overlay — `docs/AUDIT_PROMPT.md`
+
+**Специфика Kino-app** (scoped): [`docs/rules/scoped/kino-app-specific.md`](docs/rules/scoped/kino-app-specific.md) — design-system маппинг, безопасность (verify_jwt/CORS/RLS/zod), стек, среда.
+
+Архитектура rules и правила синка — [`docs/rules/README.md`](docs/rules/README.md).
 
 ---
 
@@ -122,51 +132,11 @@ git pull origin main
 
 ---
 
-## ⚠️ Design System (обязательно перед UI-правкой)
-
-Submodule `kino-design-system/` → `github.com/Arsid0305/design-system`. Инициализировать: `git submodule update --init`; обновить: `git submodule update --remote`.
-
-Перед изменением любого UI-компонента открыть соответствующий превью из `kino-design-system/kino-app/preview/`:
-
-| Что меняешь | Файл |
-|-------------|------|
-| Карточка фильма / чат-карточка | `component-cards.html` |
-| Кнопки | `component-buttons.html` |
-| Чипы (фильтры, теги) | `component-chips.html` |
-| Шапка + табы + stat-карточки | `component-nav.html` |
-| Чат-окно AI | `component-chat.html` |
-| Форма входа / OTP / профиль | `component-auth.html` |
-| Цвета, фоны | `colors-base.html`, `colors-semantic.html` |
-| Шрифты | `type-display.html`, `type-body.html` |
-| Тени, glow | `shadows-glow.html` |
-| Отступы | `spacing-tokens.html` |
-
-Не выдумывать UI с нуля — брать классы/токены из превью в Tailwind.
-
----
-
 ## Task Management
 
 - `tasks/todo.md` — план BIG задач, чекбоксы, отмечать выполненное
-- `tasks/lessons.md` — паттерны ошибок, формат:
-  ```
-  ## [дата] [краткое название]
-  **Что произошло:** ...
-  **Правило:** ...
-  ```
+- `tasks/lessons.md` — паттерны ошибок (формат — в [`docs/rules/core/session-lifecycle.md`](docs/rules/core/session-lifecycle.md) §«Формат lessons.md»)
 - `docs/AUDIT_PROMPT.md` — тонкий overlay + ссылка на `llm_wiki/wiki/audit-universal.md`
-
----
-
-## Безопасность (перед первым/следующим деплоем)
-
-Полный чеклист — `docs/AUDIT_PROMPT.md` + `llm_wiki/wiki/audit-universal.md §2`. Специфично для Kino-app:
-
-- `service_role` только в Supabase / GitHub Secrets, никогда во `VITE_*`
-- `verify_jwt: true` в `supabase/config.toml` для обеих функций (закоммичено)
-- CORS whitelist — hardcoded fallback (`https://kino-app.vercel.app`) + `ALLOWED_ORIGINS` secret (валидация в `deploy.yml`)
-- RLS через `auth.uid() = user_id` на всех `public.*` таблицах
-- `zod`-валидация всех входных данных в Edge Functions (TODO)
 
 ---
 
@@ -184,16 +154,6 @@ API-ключи в Supabase Secrets: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOG
 
 ---
 
-## Стек / среда
-
-- React + Vite + TypeScript + Tailwind + shadcn/ui + Framer Motion
-- Supabase Auth (email OTP + анонимный) + Edge Functions (Deno)
-- Тесты: Vitest (`npm test`)
-- Design System: `kino-design-system/` (submodule)
-- Среда Claude: Node.js v22, npm v10, Vitest ✅ · Python / Supabase CLI / Deno ❌ · `.env` реальный ❌
-
-Стандартные пакеты: `lucide-react`, `sonner`, `next-themes`, `zod`, `date-fns`, `xlsx`, `@resvg/resvg-js`.
-
-Пути на машине пользователя (проверено 2026-08-16):
+## Пути на машине пользователя (проверено 2026-08-16)
 - рабочая копия — `C:\DATA\PROJECTS\Kino-app`
 - клон под деплой — `C:\Users\arols\kino-deploy` (отдельный, потому что `vercel --prod` отправляет папку как есть, вместе с незакоммиченными правками)
