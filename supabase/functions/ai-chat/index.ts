@@ -266,6 +266,7 @@ serve(async req => {
       watchedMovies?: unknown;
       watchlistMovies?: unknown;
       dismissedMovies?: unknown;
+      forbiddenTitles?: unknown;
     } | null;
 
     if (!body || typeof body !== "object") return jsonResponse(origin, 400, { error: "Некорректное тело запроса" });
@@ -466,15 +467,25 @@ ${tasteProfile || "еще формируется"}
     const reply = typeof parsed.reply === "string" ? parsed.reply.trim() : raw;
     const rawSuggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
 
-    const forbiddenTitleSet = new Set<string>(
-      [
-        ...(watchedMovies as MovieCtx[]),
-        ...(watchlistMovies as MovieCtx[]),
-        ...(dismissedMovies as MovieCtx[]),
-      ]
-        .map(m => (m.titleRu ?? m.title ?? "").toLowerCase().trim())
-        .filter(Boolean)
-    );
+    // В промпт уходит только MAX_MOVIES из каждого списка, но фильтровать
+    // ответ модели надо по всем: клиент шлёт полный набор titleRu в
+    // body.forbiddenTitles. Пока клиент старый и поле не пришло — деградируем
+    // на прежний расчёт из объектов.
+    const normalizeTitle = (v: string) => v.trim().toLowerCase().replace(/\s+/g, " ");
+    const clientForbidden = Array.isArray(body.forbiddenTitles)
+      ? body.forbiddenTitles.filter((v: unknown): v is string => typeof v === "string")
+      : null;
+    const forbiddenTitleSet = clientForbidden
+      ? new Set(clientForbidden.map(normalizeTitle).filter(Boolean))
+      : new Set(
+          [
+            ...(watchedMovies as MovieCtx[]),
+            ...(watchlistMovies as MovieCtx[]),
+            ...(dismissedMovies as MovieCtx[]),
+          ]
+            .map(m => normalizeTitle(m.titleRu ?? m.title ?? ""))
+            .filter(Boolean)
+        );
 
     const suggestions = mode === "title_lookup" ? rawSuggestions.slice(0, 1) : rawSuggestions.filter(s => {
       if (!s || typeof s !== "object") return true;

@@ -6,6 +6,13 @@ function normalizeText(value: string | undefined): string {
   return (value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
+// Ключ только по названию — без года и типа. Нужен для чёрного списка LLM:
+// модель часто выдумывает не тот год (напр. «Завтрак у Тиффани 2018» вместо 1961),
+// и точное сравнение через getMovieDedupKey не сработает — а по названию поймает.
+export function getTitleOnlyKey(movie: Pick<Movie, 'title' | 'titleRu'> | { titleRu?: string; title?: string }): string {
+  return normalizeText(movie.titleRu || movie.title);
+}
+
 export function getMovieIdentityKey(movie: MovieIdentity): string {
   const title = normalizeText(movie.titleRu || movie.title);
   const year = Number.isFinite(movie.year) && movie.year && movie.year > 0 ? String(movie.year) : 'unknown';

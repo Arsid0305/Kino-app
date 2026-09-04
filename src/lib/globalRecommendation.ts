@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { FilterState, Movie, WatchedMovie } from './movieTypes';
 import { buildFilterSummary, buildTasteProfileSummary, toMovieContext } from './tasteProfile';
-import { getMovieDedupKey } from './movieIdentity';
+import { getMovieDedupKey, getTitleOnlyKey } from './movieIdentity';
 
 const RECOMMENDATION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/movie-recommendation`;
 
@@ -57,6 +57,14 @@ export async function requestGlobalRecommendation(
       watchedMovies: watched.slice(0, 80).map(toMovieContext),
       watchlistMovies: watchlist.slice(0, 80).map(toMovieContext),
       dismissedMovies: dismissed.slice(0, 80).map(toMovieContext),
+      // Полный чёрный список названий — нужен серверу для пост-фильтра.
+      // Модели в промпт уходит только 80, но фильтровать ответ надо по ВСЕМ,
+      // иначе повторно вылезет что-то из давно просмотренного вне окна.
+      forbiddenTitles: [
+        ...watched.map(getTitleOnlyKey),
+        ...watchlist.map(getTitleOnlyKey),
+        ...dismissed.map(getTitleOnlyKey),
+      ].filter(Boolean),
     }),
   });
 
@@ -76,12 +84,25 @@ export async function requestGlobalRecommendation(
 
   const allMovies = rawRecs.map(normalizeRecommendation);
 
-  // Filter out any movie the user already watched, has in watchlist, or dismissed
+  // Клиентский пост-фильтр: по названию (без учёта года/типа) — модель часто
+  // выдумывает не тот год и getMovieDedupKey эти дубликаты пропускает.
+  // Ключ по dedup оставляем как второй барьер на случай, если названия
+  // немного расходятся, а id/год/тип совпадают.
   const excludedKeys = new Set([
     ...watched.map(getMovieDedupKey),
     ...watchlist.map(getMovieDedupKey),
     ...dismissed.map(getMovieDedupKey),
   ]);
+  const excludedTitles = new Set(
+    [
+      ...watched.map(getTitleOnlyKey),
+      ...watchlist.map(getTitleOnlyKey),
+      ...dismissed.map(getTitleOnlyKey),
+    ].filter(Boolean)
+  );
 
-  return allMovies.filter(m => !excludedKeys.has(getMovieDedupKey(m)));
+  return allMovies.filter(m =>
+    !excludedKeys.has(getMovieDedupKey(m)) &&
+    !excludedTitles.has(getTitleOnlyKey(m))
+  );
 }
