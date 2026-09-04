@@ -13,7 +13,7 @@ const moodLabel = (m: string) => {
 };
 import { buildFilterSummary, buildTasteProfileSummary, toMovieContext } from '@/lib/tasteProfile';
 import { loadChatMessages, saveChatMessage, StoredChatMessage } from '@/lib/chatStore';
-import { getMovieDedupKey } from '@/lib/movieIdentity';
+import { getMovieDedupKey, getTitleOnlyKey } from '@/lib/movieIdentity';
 
 type AdvisorMessage = {
   id: string;
@@ -242,6 +242,14 @@ export const AiAdvisor = ({
           watchedMovies: watchedMovies.slice(0, MAX_MOVIES_IN_CONTEXT).map(toMovieContext),
           watchlistMovies: watchlistMovies.slice(0, MAX_MOVIES_IN_CONTEXT).map(toMovieContext),
           dismissedMovies: dismissedMovies.slice(0, MAX_MOVIES_IN_CONTEXT).map(toMovieContext),
+          // Полный чёрный список названий — нужен серверу для пост-фильтра.
+          // Модели в промпт уходит только MAX_MOVIES_IN_CONTEXT, но фильтровать
+          // ответ надо по ВСЕМ, иначе LLM снова предложит давно просмотренный.
+          forbiddenTitles: [
+            ...watchedMovies.map(getTitleOnlyKey),
+            ...watchlistMovies.map(getTitleOnlyKey),
+            ...dismissedMovies.map(getTitleOnlyKey),
+          ].filter(Boolean),
         }),
       });
 

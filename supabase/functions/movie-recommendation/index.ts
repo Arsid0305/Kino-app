@@ -93,6 +93,7 @@ serve(async req => {
       watchedMovies?: unknown;
       watchlistMovies?: unknown;
       dismissedMovies?: unknown;
+      forbiddenTitles?: unknown;
     } | null;
 
     if (!body || typeof body !== "object") return jsonResponse(origin, 400, { error: "Некорректное тело запроса" });
@@ -118,15 +119,25 @@ serve(async req => {
     const watchlistTitles = titlesOf(watchlistMovies.slice(0, 40));
     const dismissedTitles = titlesOf(dismissedMovies.slice(0, 40));
 
-    const forbiddenTitleSet = new Set<string>(
-      [
-        ...(watchedMovies as MovieCtx[]),
-        ...(watchlistMovies as MovieCtx[]),
-        ...(dismissedMovies as MovieCtx[]),
-      ]
-        .map(m => (m.titleRu ?? m.title ?? "").toLowerCase().trim())
-        .filter(Boolean)
-    );
+    // Клиент шлёт полный набор titleRu в body.forbiddenTitles — фильтруем
+    // ответ модели по всем 500+ фильмам, а не по 80, что уходят в промпт.
+    // Совместимо со старым клиентом: если поле не пришло — деградируем на
+    // прежний расчёт из объектов контекста.
+    const normalizeTitle = (v: string) => v.trim().toLowerCase().replace(/\s+/g, " ");
+    const clientForbidden = Array.isArray(body.forbiddenTitles)
+      ? body.forbiddenTitles.filter((v: unknown): v is string => typeof v === "string")
+      : null;
+    const forbiddenTitleSet = clientForbidden
+      ? new Set(clientForbidden.map(normalizeTitle).filter(Boolean))
+      : new Set(
+          [
+            ...(watchedMovies as MovieCtx[]),
+            ...(watchlistMovies as MovieCtx[]),
+            ...(dismissedMovies as MovieCtx[]),
+          ]
+            .map(m => normalizeTitle(m.titleRu ?? m.title ?? ""))
+            .filter(Boolean)
+        );
 
     const buildBody = (model: string, useCompletionTokens: boolean) => {
       const tokenParam = useCompletionTokens
