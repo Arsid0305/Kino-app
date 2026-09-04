@@ -37,7 +37,7 @@ import {
   upsertWatchlistMovie,
   upsertWatchlistMovies,
 } from '@/lib/supabaseMovieStore';
-import { requestGlobalRecommendation } from '@/lib/globalRecommendation';
+import { requestGlobalRecommendation, type RecommendationProvider } from '@/lib/globalRecommendation';
 import { searchMovieByTitle } from '@/lib/titleSearch';
 
 type Tab = 'recommend' | 'history';
@@ -67,6 +67,17 @@ const Index = () => {
   const [watched, setWatched] = useState<WatchedMovie[]>(() => loadLocalArray<WatchedMovie>('cinema-watched'));
   const [customMovies, setCustomMovies] = useState<Movie[]>(() => loadLocalArray<Movie>('cinema-custom-movies'));
   const [dismissedMovies, setDismissedMovies] = useState<Movie[]>(() => loadLocalArray<Movie>('cinema-dismissed-movies'));
+
+  // Провайдер для кнопки «Подбор». Выбор сохраняем — GPT флагман по умолчанию.
+  const [recommendationProvider, setRecommendationProviderState] = useState<RecommendationProvider>(() => {
+    const saved = localStorage.getItem('kino-recommendation-provider');
+    return (['claude', 'gpt4o', 'gemini', 'deepseek'] as const).includes(saved as RecommendationProvider)
+      ? (saved as RecommendationProvider) : 'gpt4o';
+  });
+  const setRecommendationProvider = (p: RecommendationProvider) => {
+    setRecommendationProviderState(p);
+    localStorage.setItem('kino-recommendation-provider', p);
+  };
   const [session, setSession] = useState<Session | null>(null);
   const [syncStatus, setSyncStatus] = useState('Локальный режим');
   const [loadingRecommendation, setLoadingRecommendation] = useState(false);
@@ -175,7 +186,7 @@ const Index = () => {
 
     try {
       if (session) {
-        const aiMovies = await requestGlobalRecommendation(filters, watched, customMovies, dismissedMovies);
+        const aiMovies = await requestGlobalRecommendation(filters, watched, customMovies, dismissedMovies, recommendationProvider);
         setRecommendations(aiMovies);
         return;
       }
@@ -190,7 +201,7 @@ const Index = () => {
     } finally {
       setLoadingRecommendation(false);
     }
-  }, [session, filters, watched, customMovies, dismissedMovies]);
+  }, [session, filters, watched, customMovies, dismissedMovies, recommendationProvider]);
 
   const handleTitleSearch = async () => {
     const query = titleQuery.trim();
@@ -464,6 +475,30 @@ const Index = () => {
                   </motion.button>
                 )}
               </AnimatePresence>
+
+              {session && (
+                <div className="flex gap-1 p-1 rounded-xl bg-secondary/50">
+                  {([
+                    { id: 'claude' as const, label: 'Claude' },
+                    { id: 'gpt4o' as const, label: 'GPT' },
+                    { id: 'gemini' as const, label: 'Gemini' },
+                    { id: 'deepseek' as const, label: 'DS' },
+                  ]).map(p => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setRecommendationProvider(p.id)}
+                      className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                        recommendationProvider === p.id
+                          ? 'bg-card text-foreground shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               <motion.button
                 whileTap={{ scale: 0.97 }}

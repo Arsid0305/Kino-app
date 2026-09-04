@@ -35,11 +35,14 @@ function normalizeRecommendation(raw: Record<string, unknown>): Movie {
   };
 }
 
+export type RecommendationProvider = 'claude' | 'gpt4o' | 'gemini' | 'deepseek';
+
 export async function requestGlobalRecommendation(
   filters: FilterState,
   watched: WatchedMovie[],
   watchlist: Movie[],
-  dismissed: Movie[] = []
+  dismissed: Movie[] = [],
+  provider: RecommendationProvider = 'gpt4o'
 ): Promise<Movie[]> {
   const { data } = await supabase.auth.getSession();
   const accessToken = data.session?.access_token;
@@ -52,6 +55,7 @@ export async function requestGlobalRecommendation(
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
     body: JSON.stringify({
+      provider,
       filters: buildFilterSummary(filters),
       tasteProfile: buildTasteProfileSummary(watched, watchlist),
       watchedMovies: watched.slice(0, 80).map(toMovieContext),
