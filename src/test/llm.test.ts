@@ -36,7 +36,7 @@ describe('callProvider: параметры запроса', () => {
     )));
     await callProvider(p, req, allKeys, 1000, fetchFn as unknown as typeof fetch);
     const [url, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
-    return { url, body: JSON.parse(init.body as string) };
+    return { url, body: JSON.parse(init.body as string), headers: init.headers as Record<string, string> };
   };
   it('Claude: новый ID, без temperature, лимит 16000', async () => {
     const { body } = await capture('claude');
@@ -57,6 +57,8 @@ describe('callProvider: параметры запроса', () => {
     expect(ds.body.temperature).toBe(1);
     const g = await capture('gemini');
     expect(g.url).toContain('gemini-3.6-flash');
+    expect(g.url).not.toContain('key=');
+    expect(g.headers['x-goog-api-key']).toBe('k');
     expect(g.body.generationConfig.maxOutputTokens).toBe(MAX_TOKENS);
   });
 });
