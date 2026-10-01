@@ -14,13 +14,12 @@
 ---
 
 ## 2. Infrastructure & CI/CD
-- Frontend deploy: Vercel (из `main`)
+- Frontend deploy: Vercel, только вручную — `scripts/deploy.ps1` (автодеплой мёртв с 26.06.2026, см. `CLAUDE.md`)
 - Repo: github.com/Arsid0305/Kino-app
 
 Workflows:
-- `automerge.yml` — `claude/** | cursor/**` → `main` авто ✅
-- `promote.yml` — существует, не трогать ✅
-- `deploy.yml` — Supabase Edge Functions deploy (GitHub Actions)
+- Автомержа нет — PR мержит владелица кнопкой
+- `deploy.yml` — Supabase Edge Functions deploy (GitHub Actions; пока Actions заблокированы — через Supabase MCP)
 
 ---
 
@@ -30,7 +29,7 @@ Workflows:
 |------|--------|------|
 | Node.js / npm | ✅ | `npm ci` |
 | Python | ❌ | не используется |
-| Supabase CLI | ❌ | Edge Functions деплоятся через GitHub Actions |
+| Supabase CLI | ❌ | Edge Functions деплоятся через Supabase MCP |
 | .env (real keys) | ✅ | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` |
 
 ---
@@ -45,12 +44,9 @@ shadcn/ui — компоненты в `src/components/ui/`. Перед UI изм
 
 ```
 .github/workflows/
-  automerge.yml        — авто-мерж ветки в main
-  promote.yml          — существует, не трогать
+  deploy.yml           — деплой Edge Functions
 docs/
   AUDIT_PROMPT.md      — контекст для аудита
-scripts/
-  check_consistency.py — CI-проверки консистентности
 src/
   lib/
     movieEngine.ts     — SSOT: логика рекомендаций
