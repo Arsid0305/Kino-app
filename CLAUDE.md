@@ -5,97 +5,23 @@
 
 ---
 
-## 🚨 TEMPORARY — GitHub Actions заблокированы (пока T&S не снимет флаг)
+## Деплой и мерж
 
-_Активен с: июль 2026. Последняя проверка: 2026-08-19._
+_Проверено: 2026-10-01. Флаг T&S на аккаунте снят 2026-09-12 (`llm_wiki/wiki/workflow.md`)._
 
-Аккаунт `Arsid0305` помечен suspicious, GitHub Actions отключены на уровне account. Тикет #4535795 в работе с июля 2026.
+- **Мерж** — только владелица, кнопкой; PR сразу не-draft. Мерж через API запрещён — [`AI_OS/docs/rules/core/github-anti-abuse.md`](https://github.com/Arsid0305/AI_OS/blob/main/docs/rules/core/github-anti-abuse.md). Перед каждым «мержи» — проверить, не смержен ли PR уже.
+- **Фронт** — Vercel деплоит сам при пуше в `main`. `scripts/deploy.ps1` — запасной ручной путь.
+- **Edge functions** — `.github/workflows/deploy.yml` при изменении `supabase/functions/**` в `main`. Если workflow упал — деплой через Supabase MCP (`deploy_edge_function`) и сообщить номер версии.
+- **Миграции** — автоматики нет: применять через Supabase MCP (`apply_migration`) или SQL Editor и класть файл в `supabase/migrations/`. `DROP` через MCP зависал (2026-10-01) — такое давать владелице в SQL Editor.
 
-**Как убедиться что блок ещё актуален** (быстрая проверка в начале сессии): `mcp__github__actions_list` для `Arsid0305/Kino-app` → если `total_count: 0` за последние 24 часа, блок ещё актуален. Если пошли runs — снимать блок и восстановить обычный автоматизированный workflow.
-
-**Что НЕ работает пока флаг активен:**
-- `deploy.yml` — **edge functions больше не деплоятся автоматически**
-- OAuth третьих сторон через GitHub (Supabase login и т.п.)
-
-**Что тоже НЕ работает (проверено 2026-08-16):**
-- **Vercel-автодеплой мёртв с 26 июня** — GitHub-интеграция отвалилась вместе с флагом. Ни production при пуше в main, ни preview на PR. Раньше здесь было написано, что Vercel работает — это неверно, полдня ушло на поиск несуществующих preview-ссылок.
-- **Supabase GitHub Integration не подключить** — GitHub отказывает: «This account is flagged, and therefore cannot authorize a third party application».
-
-**Что работает:**
-- Деплой edge functions через Supabase MCP (`deploy_edge_function`) — мимо GitHub
-- Миграции и SQL через Supabase MCP
-- **Фронт-деплой — только вручную** с машины пользователя: `scripts/deploy.ps1` (см. ниже). Через MCP не выходит: бандл 1.3 МБ в вызов не помещается.
-
-### Деплой фронта (единственный ручной шаг)
-
-```powershell
-cd <клон репозитория>
-.\scripts\deploy.ps1              # фронт
-.\scripts\deploy.ps1 -Functions   # фронт + edge functions
-```
-
-Скрипт сам проверит чистоту рабочей копии, подтянет main, прогонит `tsc` и тесты, соберёт и задеплоит. Останавливается на первой ошибке.
-
-Требуется один раз: `npm i -g vercel` и `vercel login` — **входить по email, не через GitHub** (упрётся в тот же флаг).
-
-Деплоить надо **из отдельного чистого клона**: `vercel --prod` отправляет файлы как есть, вместе с незакоммиченными правками.
-
-### Merge protocol (обязательный чеклист перед мержем)
-
-Локально до пуша:
+Перед мержем владелица прогоняет локально:
 ```bash
-npm ci                    # если давно не ставила
-npm test -- --run
-npx eslint src/
-npx tsc --noEmit
-```
-Если хоть что-то красное — **не мержить**.
-
-Плюс:
-- Один PR = одна тема. Легче откатить.
-- PR **не старше 1-2 дней** — иначе конфликты.
-- **`supabase/functions/**` — после мержа Claude деплоит через Supabase MCP** (`deploy_edge_function`, см. напоминание №2). Иначе прод не обновится.
-
-### Частота
-
-| ситуация | сколько раз в день |
-|---|---|
-| мелкие UI-правки | 3-5 |
-| логика фронта | 1-3 |
-| edge functions | 0-1 (плюс ручной деплой сразу) |
-| миграции / RLS / схема БД | 0-1 (с проверкой `get_advisors` после) |
-
-### Экстренный откат
-- **фронт:** Vercel Dashboard → Deployments → предыдущий → Promote to Production
-- **edge function:** Supabase Dashboard → Edge Functions → Deploy previous version
-
-### Мерж
-PR создавай **сразу не-draft**. Мержит владелица кнопкой; мерж через API запрещён — [`AI_OS/docs/rules/core/github-anti-abuse.md`](https://github.com/Arsid0305/AI_OS/blob/main/docs/rules/core/github-anti-abuse.md).
-
-### Обязательные напоминания пользователю (проактивно)
-
-Claude **сам** проговаривает эти пункты — не ждёт запроса:
-
-1. **Перед каждым мержем** — короткая строка: «Прогнала локально `npm test && eslint && tsc --noEmit`?» Если пользователь не подтвердила — не мержить.
-2. **После мержа PR, где менялись `supabase/functions/**`** — Claude деплоит их сам через Supabase MCP (`deploy_edge_function`), не перекладывая на пользователя, и сообщает новый номер версии.
-2a. **После КАЖДОГО мержа в `main` — сразу дать готовый блок команд.** Не «не забудь задеплоить», а именно копируемые строки:
-
-```powershell
-cd C:\Users\arols\kino-deploy
-git pull origin main
-.\scripts\deploy.ps1
+npm ci && npm test -- --run && npx tsc --noEmit
 ```
 
-Ждать вопроса не надо, пользователь просила писать это самой. Правило действует, пока Vercel не деплоит из GitHub.
+После мержа напомнить: service worker отдаёт старую версию до **второго** захода — обновить страницу дважды, на телефоне закрыть и открыть приложение. После миграций / RLS — `get_advisors type=security`.
 
-Если мерж не влияет на бандл (правки только в `docs/`, `tasks/`, `CLAUDE.md`, `scripts/`, `supabase/**`) — вместо блока сказать прямо: «деплой не нужен, менялись только <что>». Молчать нельзя в обоих случаях: пользователь не должна гадать, доехало до браузера или нет.
-
-После деплоя напомнить, что service worker отдаёт старую версию до **второго** захода: обновить страницу дважды, на телефоне — закрыть и открыть приложение. Если не помогло — Настройки → Safari → Дополнения → Данные сайтов → `vercel.app` → удалить.
-3. **После мержа миграций / изменений RLS / схемы БД** — «Запусти `get_advisors type=security` — проверь, не появилось ли новых ERROR».
-4. **Если пользователь просит подключить новый OAuth к любому сервису через GitHub** — «Флаг suspicious ещё активен, OAuth через GitHub не сработает. Используй другой login-провайдер (Google/email/OpenAI)».
-5. **В начале каждой сессии** — если `mcp__github__actions_list` для Kino-app возвращает `total_count: 0`, напомнить: «Actions ещё заблокированы. Merge-protocol в силе».
-
-**Убрать этот блок**, когда T&S снимет флаг и `mcp__github__actions_list` начнёт возвращать нормальные runs.
+**Откат:** фронт — Vercel Dashboard → Deployments → предыдущий → Promote to Production; edge function — Supabase Dashboard → Edge Functions → предыдущая версия.
 
 ---
 
@@ -138,14 +64,13 @@ git pull origin main
 
 ## Инфраструктура
 
-_Проверено: 2026-08-19._
+_Проверено: 2026-10-01._
 
-- Vercel — фронтенд. **Автодеплой мёртв с 26.06.2026** (GitHub-интеграция отвалилась вместе с T&S-флагом). Деплой только ручной: `scripts/deploy.ps1` из отдельного клона (см. TEMPORARY-блок в начале файла).
-- Supabase — БД, Auth, Edge Functions (`ai-chat`, `movie-recommendation`), проект `ovhwxfdtkzwxfomdlgjv`. Деплой edge functions — вручную через Supabase MCP (`deploy_edge_function`) после мержа.
-- GitHub Actions — **фактически не работают** пока активен T&S-флаг. Файлы workflow сохранены, автоматически включатся когда флаг снимут:
-  - `deploy.yml` — деплой Edge Functions при изменении `supabase/functions/**`. Сейчас через Supabase MCP.
+- Vercel — фронтенд, автодеплой из `main`. Прод: `https://kino-arsid.vercel.app`.
+- Supabase — БД (схема `kino`, представления в `public`), Auth, Edge Functions (`ai-chat`, `movie-recommendation`), проект `ovhwxfdtkzwxfomdlgjv`. **Проект общий с Technical-language** (схема `technical_language`, функции `lookup-word`, `generate-lesson`) — перед удалением/изменением общих объектов (`public.check_rate_limit`) проверять, кто их вызывает.
+- GitHub Actions — `deploy.yml` (edge functions).
 
-API-ключи в Supabase Secrets: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `DEEPSEEK_API_KEY`, `ALLOWED_ORIGINS`.
+API-ключи в Supabase Secrets: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `DEEPSEEK_API_KEY`, `TAVILY_API_KEY`, `ALLOWED_ORIGINS`.
 
 ---
 

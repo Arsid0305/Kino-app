@@ -14,12 +14,12 @@
 ---
 
 ## 2. Infrastructure & CI/CD
-- Frontend deploy: Vercel, только вручную — `scripts/deploy.ps1` (автодеплой мёртв с 26.06.2026, см. `CLAUDE.md`)
+- Frontend deploy: Vercel, автодеплой из `main`
 - Repo: github.com/Arsid0305/Kino-app
 
 Workflows:
 - Автомержа нет — PR мержит владелица кнопкой
-- `deploy.yml` — Supabase Edge Functions deploy (GitHub Actions; пока Actions заблокированы — через Supabase MCP)
+- `deploy.yml` — Supabase Edge Functions deploy (GitHub Actions)
 
 ---
 
@@ -29,7 +29,7 @@ Workflows:
 |------|--------|------|
 | Node.js / npm | ✅ | `npm ci` |
 | Python | ❌ | не используется |
-| Supabase CLI | ❌ | Edge Functions деплоятся через Supabase MCP |
+| Supabase CLI | ❌ | Edge Functions деплоятся через `deploy.yml` |
 | .env (real keys) | ✅ | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` |
 
 ---
