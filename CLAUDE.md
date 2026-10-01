@@ -5,26 +5,6 @@
 
 ---
 
-## Деплой и мерж
-
-_Проверено: 2026-10-01. Флаг T&S на аккаунте снят 2026-09-12 (`llm_wiki/wiki/workflow.md`)._
-
-- **Мерж** — только владелица, кнопкой; PR сразу не-draft. Мерж через API запрещён — [`AI_OS/docs/rules/core/github-anti-abuse.md`](https://github.com/Arsid0305/AI_OS/blob/main/docs/rules/core/github-anti-abuse.md). Перед каждым «мержи» — проверить, не смержен ли PR уже.
-- **Фронт** — Vercel деплоит сам при пуше в `main`. `scripts/deploy.ps1` — запасной ручной путь.
-- **Edge functions** — `.github/workflows/deploy.yml` при изменении `supabase/functions/**` в `main`. Если workflow упал — деплой через Supabase MCP (`deploy_edge_function`) и сообщить номер версии.
-- **Миграции** — автоматики нет: применять через Supabase MCP (`apply_migration`) или SQL Editor и класть файл в `supabase/migrations/`. `DROP` через MCP зависал (2026-10-01) — такое давать владелице в SQL Editor.
-
-Перед мержем владелица прогоняет локально:
-```bash
-npm ci && npm test -- --run && npx tsc --noEmit
-```
-
-После мержа напомнить: service worker отдаёт старую версию до **второго** захода — обновить страницу дважды, на телефоне закрыть и открыть приложение. После миграций / RLS — `get_advisors type=security`.
-
-**Откат:** фронт — Vercel Dashboard → Deployments → предыдущий → Promote to Production; edge function — Supabase Dashboard → Edge Functions → предыдущая версия.
-
----
-
 ## Каноны (rules как атомы)
 
 Универсальные правила — в `AI_OS/docs/rules/core/*.md` (SSOT, копий в этом репо нет). Если AI_OS не подключён к сессии — попросить подключить, по памяти не работать:
@@ -48,12 +28,6 @@ npm ci && npm test -- --run && npx tsc --noEmit
 
 ---
 
-## LLM_Wiki
-
-В начале сессии читать: `wiki/lessons.md`, `wiki/decisions.md`, `wiki/projects.md`.
-
----
-
 ## Task Management
 
 - `tasks/todo.md` — план BIG задач, чекбоксы, отмечать выполненное
@@ -62,15 +36,17 @@ npm ci && npm test -- --run && npx tsc --noEmit
 
 ---
 
-## Инфраструктура
+## Инфраструктура и деплой
 
-_Проверено: 2026-10-01._
+_Проверено: 2026-10-01. Мерж — канон `llm_wiki/wiki/workflow.md` (только владелица, кнопкой)._
 
-- Vercel — фронтенд, автодеплой из `main`. Прод: `https://kino-arsid.vercel.app`.
-- Supabase — БД (схема `kino`, представления в `public`), Auth, Edge Functions (`ai-chat`, `movie-recommendation`), проект `ovhwxfdtkzwxfomdlgjv`. **Проект общий с Technical-language** (схема `technical_language`, функции `lookup-word`, `generate-lesson`) — перед удалением/изменением общих объектов (`public.check_rate_limit`) проверять, кто их вызывает.
-- GitHub Actions — `deploy.yml` (edge functions).
+- **Фронт** — Vercel, автодеплой из `main`. Прод: `https://kino-arsid.vercel.app`. `scripts/deploy.ps1` — запасной ручной путь.
+- **Edge functions** (`ai-chat`, `movie-recommendation`) — `.github/workflows/deploy.yml` при изменении `supabase/functions/**`. Упал — деплой через Supabase MCP (`deploy_edge_function`), сообщить номер версии.
+- **БД** — Supabase `ovhwxfdtkzwxfomdlgjv`, схема `kino`, представления в `public`. Миграции вручную: Supabase MCP (`apply_migration`) или SQL Editor + файл в `supabase/migrations/`. `DROP` через MCP зависал — такое владелице в SQL Editor. После миграций / RLS — `get_advisors type=security`.
+- **Проект Supabase общий с Technical-language** (схема `technical_language`, функции `lookup-word`, `generate-lesson`) — перед изменением общих объектов (`public.check_rate_limit`) проверять, кто их вызывает.
+- **Secrets:** `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `DEEPSEEK_API_KEY`, `TAVILY_API_KEY`, `ALLOWED_ORIGINS`.
 
-API-ключи в Supabase Secrets: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `DEEPSEEK_API_KEY`, `TAVILY_API_KEY`, `ALLOWED_ORIGINS`.
+Перед мержем владелица прогоняет `npm ci && npm test -- --run && npx tsc --noEmit`. После деплоя напомнить: service worker отдаёт старую версию до **второго** захода. Откат: Vercel → Deployments → Promote предыдущий; Supabase → Edge Functions → предыдущая версия.
 
 ---
 
