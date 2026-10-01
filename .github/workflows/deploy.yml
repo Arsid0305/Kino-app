@@ -16,9 +16,9 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
 
-      - uses: supabase/setup-cli@2b81a2f4f21fc45c34bc5c4a24ddc2b31e2c34fe  # v1.1.1
+      - uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb  # v1.7.3
         with:
-          version: 2.20.5  # закреплено: latest менял поведение без коммита (сверить при снятии блока Actions)
+          version: 2.20.5  # закреплено, чтобы latest не менял поведение без коммита
 
       - name: Verify ALLOWED_ORIGINS secret не пуст (защита от CORS-fallback)
         env:

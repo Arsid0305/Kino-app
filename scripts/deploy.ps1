@@ -1,10 +1,9 @@
 ﻿<#
 .SYNOPSIS
-  Ручной деплой Kino-app, пока GitHub Actions заблокированы флагом T&S.
+  Запасной ручной деплой Kino-app (обычно фронт деплоит Vercel из main).
 
 .DESCRIPTION
-  Пока на аккаунте Arsid0305 висит флаг, не работают ни Actions, ни
-  GitHub-интеграции Vercel и Supabase. Этот скрипт заменяет их одной командой:
+  Нужен, если автодеплой Vercel или deploy.yml не сработали. Одной командой:
   подтягивает main, ставит зависимости, гоняет проверки и деплоит фронт на Vercel.
   Edge functions деплоятся отдельным ключом -Functions (нужен Supabase CLI).
 

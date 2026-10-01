@@ -42,6 +42,16 @@ Submodule `kino-design-system/` → `github.com/Arsid0305/design-system`. Ини
 
 Стандартные пакеты: `lucide-react`, `sonner`, `next-themes`, `zod`, `date-fns`, `xlsx`, `@resvg/resvg-js`.
 
+## Где что лежит (SSOT в коде)
+
+- `src/lib/movieEngine.ts` — логика рекомендаций; `src/lib/movieTypes.ts` — типы фильмов
+- `supabase/functions/` — edge functions; `_shared/` — CORS, вызов LLM, проверка входных данных
+- `supabase/migrations/` — схема БД (baseline `kino` + изменения)
+
+## Auth (Supabase OTP)
+
+`signInWithOtp({ email })` → `verifyOtp({ email, token, type: 'email' })`. Код — **8 цифр** (не 6).
+
 ## Среда Claude
 - Node.js v22, npm v10, Vitest ✅
 - Python / Supabase CLI / Deno ❌
