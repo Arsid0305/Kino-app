@@ -1,163 +1,18 @@
-// ai-chat edge function — multi-provider: Claude / GPT-4o / Gemini / DeepSeek
+// ai-chat edge function — multi-provider: Claude / OpenAI / Gemini / DeepSeek, с фолбэком
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, isOriginAllowed } from "../_shared/cors.ts";
+import { ALL_PROVIDERS, callWithFallback, type ChatMessage, type Provider } from "../_shared/llm.ts";
 const MAX_MESSAGES = 20;
 const MAX_MESSAGE_LENGTH = 2000;
 const MAX_TOTAL_MESSAGE_LENGTH = 12000;
 const MAX_MOVIES = 30;
 const MAX_REQUESTS_PER_MINUTE = 10;
-// Свежие модели на сентябрь 2026. Переопределяются секретом Supabase.
-const DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-pro";
-const DEFAULT_OPENAI_MODEL = "gpt-5.6-terra";
-const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash";
-const DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-5";
-
-type Provider = "deepseek" | "gpt4o" | "gemini" | "claude";
-
 // Admin client for rate limiting — uses service role key, persists across cold starts
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL") ?? "",
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
 );
-
-async function callOpenAICompat(
-  apiKey: string,
-  baseUrl: string,
-  model: string,
-  systemPrompt: string,
-  messages: ChatMessage[],
-  useCompletionTokens = false,
-): Promise<string> {
-  const tokenParam = useCompletionTokens
-    ? { max_completion_tokens: 3000 }
-    : { max_tokens: 3000 };
-  const body: Record<string, unknown> = {
-    model,
-    messages: [{ role: "system", content: systemPrompt }, ...messages],
-    ...tokenParam,
-    response_format: { type: "json_object" },
-  };
-  if (!useCompletionTokens) body.temperature = 0.7;
-  const res = await fetch(`${baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    console.error(`${baseUrl} ${res.status}: ${(await res.text()).slice(0, 500)}`);
-    throw new Error(`Провайдер ответил ошибкой ${res.status}`);
-  }
-  const d = await res.json() as { choices?: { message?: { content?: string } }[] };
-  return d.choices?.[0]?.message?.content?.trim() ?? "";
-}
-
-async function callClaude(
-  apiKey: string,
-  model: string,
-  systemPrompt: string,
-  messages: ChatMessage[],
-): Promise<string> {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: 3000,
-      system: systemPrompt,
-      messages,
-    }),
-  });
-  if (!res.ok) {
-    console.error(`Anthropic ${res.status}: ${(await res.text()).slice(0, 500)}`);
-    throw new Error(`Провайдер ответил ошибкой ${res.status}`);
-  }
-  const d = await res.json() as { content?: { type: string; text: string }[] };
-  return d.content?.[0]?.text?.trim() ?? "";
-}
-
-async function callGemini(
-  apiKey: string,
-  model: string,
-  systemPrompt: string,
-  messages: ChatMessage[],
-): Promise<string> {
-  const contents: { role: string; parts: { text: string }[] }[] = [];
-  for (const m of messages) {
-    const role = m.role === "assistant" ? "model" : "user";
-    const last = contents[contents.length - 1];
-    if (last && last.role === role) {
-      last.parts[0].text += "\n" + m.content;
-    } else {
-      contents.push({ role, parts: [{ text: m.content }] });
-    }
-  }
-
-  const body = JSON.stringify({
-    system_instruction: { parts: [{ text: systemPrompt }] },
-    contents,
-    tools: [{ google_search: {} }],
-    generationConfig: { maxOutputTokens: 3000, temperature: 1.0 },
-  });
-
-  const delays = [0, 1000, 2500];
-  let lastError = "";
-  for (const delay of delays) {
-    if (delay > 0) await new Promise(r => setTimeout(r, delay));
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-      { method: "POST", headers: { "Content-Type": "application/json" }, body },
-    );
-    if (res.ok) {
-      const d = await res.json() as {
-        candidates?: { content?: { parts?: { text?: string }[] } }[];
-      };
-      const parts = d.candidates?.[0]?.content?.parts ?? [];
-      return parts.filter((p: { thought?: boolean }) => !p.thought).map((p: { text?: string }) => p.text ?? "").join("").trim();
-    }
-    console.error(`Gemini ${res.status}: ${(await res.text()).slice(0, 500)}`);
-    lastError = `Провайдер ответил ошибкой ${res.status}`;
-    if (res.status !== 503 && res.status !== 429) break;
-  }
-  throw new Error(lastError || "Gemini: все попытки исчерпаны");
-}
-
-async function callProvider(
-  provider: Provider,
-  systemPrompt: string,
-  messages: ChatMessage[],
-): Promise<string> {
-  switch (provider) {
-    case "claude": {
-      const key = Deno.env.get("ANTHROPIC_API_KEY");
-      if (!key) throw new Error("ANTHROPIC_API_KEY не настроен");
-      const model = Deno.env.get("ANTHROPIC_MODEL") ?? DEFAULT_ANTHROPIC_MODEL;
-      return callClaude(key, model, systemPrompt, messages);
-    }
-    case "gpt4o": {
-      const key = Deno.env.get("OPENAI_API_KEY");
-      if (!key) throw new Error("OPENAI_API_KEY не настроен");
-      const model = Deno.env.get("OPENAI_MODEL") ?? DEFAULT_OPENAI_MODEL;
-      return callOpenAICompat(key, "https://api.openai.com/v1", model, systemPrompt, messages, true);
-    }
-    case "gemini": {
-      const key = Deno.env.get("GOOGLE_API_KEY");
-      if (!key) throw new Error("GOOGLE_API_KEY не настроен");
-      const model = Deno.env.get("GEMINI_MODEL") ?? DEFAULT_GEMINI_MODEL;
-      return callGemini(key, model, systemPrompt, messages);
-    }
-    default: {
-      const key = Deno.env.get("DEEPSEEK_API_KEY");
-      if (!key) throw new Error("DEEPSEEK_API_KEY не настроен");
-      const model = Deno.env.get("DEEPSEEK_MODEL") ?? DEFAULT_DEEPSEEK_MODEL;
-      return callOpenAICompat(key, "https://api.deepseek.com", model, systemPrompt, messages);
-    }
-  }
-}
 
 async function tavilySearch(query: string): Promise<string> {
   const key = Deno.env.get("TAVILY_API_KEY");
@@ -190,8 +45,6 @@ function sanitizeTasteProfile(raw: string): string {
     .replace(/\n{3,}/g, '\n\n')
     .slice(0, 2000);
 }
-
-type ChatMessage = { role: "user" | "assistant"; content: string };
 
 function jsonResponse(origin: string | null, status: number, payload: Record<string, unknown>) {
   return new Response(JSON.stringify(payload), {
@@ -287,7 +140,7 @@ serve(async req => {
     const totalLen = safeMessages.reduce((s, m) => s + m.content.length, 0);
     if (totalLen > MAX_TOTAL_MESSAGE_LENGTH) return jsonResponse(origin, 400, { error: "Диалог слишком длинный" });
 
-    const provider: Provider = (["claude", "gpt4o", "gemini", "deepseek"] as const).includes(body.provider as Provider)
+    const provider: Provider = ALL_PROVIDERS.includes(body.provider as Provider)
       ? (body.provider as Provider) : "gpt4o";
     const mode: "chat" | "title_lookup" = body.mode === "title_lookup" ? "title_lookup" : "chat";
 
@@ -437,7 +290,12 @@ ${tasteProfile || "еще формируется"}
 
     const systemPrompt = mode === "title_lookup" ? titleLookupPrompt : chatPrompt;
 
-    const raw = await callProvider(provider, systemPrompt, safeMessages);
+    const { result: raw } = await callWithFallback(
+      provider,
+      { system: systemPrompt, messages: safeMessages, temperature: 0.7, json: true, geminiSearch: true },
+      name => Deno.env.get(name),
+      text => text,
+    );
 
     if (!raw) return jsonResponse(origin, 500, { error: "AI вернул пустой ответ" });
 

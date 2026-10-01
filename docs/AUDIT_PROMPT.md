@@ -13,7 +13,7 @@
 Стек: React + Vite + TypeScript + Tailwind + shadcn/ui + Framer Motion
 Бэкенд: Supabase Auth (email OTP + анонимный) + Edge Functions (Deno)
 Edge Functions: ai-chat, movie-recommendation
-Деплой: Vercel (frontend) + GitHub Actions (Edge Functions)
+Деплой: Vercel вручную (`scripts/deploy.ps1`) + Edge Functions через Supabase MCP (Actions заблокированы)
 Design System: git submodule kino-design-system/ (github.com/Arsid0305/design-system)
 ```
 
