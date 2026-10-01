@@ -18,8 +18,7 @@
 - Repo: github.com/Arsid0305/Kino-app
 
 Workflows:
-- `automerge.yml` — `claude/** | cursor/**` → `main` авто ✅
-- `promote.yml` — существует, не трогать ✅
+- Автомержа нет — PR мержит владелица кнопкой
 - `deploy.yml` — Supabase Edge Functions deploy (GitHub Actions)
 
 ---
@@ -45,12 +44,9 @@ shadcn/ui — компоненты в `src/components/ui/`. Перед UI изм
 
 ```
 .github/workflows/
-  automerge.yml        — авто-мерж ветки в main
-  promote.yml          — существует, не трогать
+  deploy.yml           — деплой Edge Functions
 docs/
   AUDIT_PROMPT.md      — контекст для аудита
-scripts/
-  check_consistency.py — CI-проверки консистентности
 src/
   lib/
     movieEngine.ts     — SSOT: логика рекомендаций

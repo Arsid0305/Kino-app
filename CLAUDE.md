@@ -1,6 +1,6 @@
 # Claude Adapter — Kino-app
 
-> Тонкий адаптер. Универсальные правила экосистемы — в `docs/rules/core/*.md` (синкается из AI_OS SSOT).
+> Тонкий адаптер. Универсальные правила экосистемы — в `AI_OS/docs/rules/core/*.md` (SSOT, копий в этом репо нет).
 > Специфика Kino-app — в `docs/rules/scoped/kino-app-specific.md`.
 
 ---
@@ -14,8 +14,6 @@ _Активен с: июль 2026. Последняя проверка: 2026-08-
 **Как убедиться что блок ещё актуален** (быстрая проверка в начале сессии): `mcp__github__actions_list` для `Arsid0305/Kino-app` → если `total_count: 0` за последние 24 часа, блок ещё актуален. Если пошли runs — снимать блок и восстановить обычный автоматизированный workflow.
 
 **Что НЕ работает пока флаг активен:**
-- `automerge.yml` — не срабатывает
-- `promote.yml` — тесты перед мержем не запускаются
 - `deploy.yml` — **edge functions больше не деплоятся автоматически**
 - OAuth третьих сторон через GitHub (Supabase login и т.п.)
 
@@ -24,7 +22,6 @@ _Активен с: июль 2026. Последняя проверка: 2026-08-
 - **Supabase GitHub Integration не подключить** — GitHub отказывает: «This account is flagged, and therefore cannot authorize a third party application».
 
 **Что работает:**
-- Прямые REST-мержи через MCP (`merge_pull_request`) — это не workflow
 - Деплой edge functions через Supabase MCP (`deploy_edge_function`) — мимо GitHub
 - Миграции и SQL через Supabase MCP
 - **Фронт-деплой — только вручную** с машины пользователя: `scripts/deploy.ps1` (см. ниже). Через MCP не выходит: бандл 1.3 МБ в вызов не помещается.
@@ -73,8 +70,8 @@ npx tsc --noEmit
 - **фронт:** Vercel Dashboard → Deployments → предыдущий → Promote to Production
 - **edge function:** Supabase Dashboard → Edge Functions → Deploy previous version
 
-### Merge через MCP (пока automerge не работает)
-PR создавай **сразу не-draft**, мержи через `mcp__github__merge_pull_request` с `merge_method: "squash"`. Draft-шаг бесполезен — automerge всё равно не сработает.
+### Мерж
+PR создавай **сразу не-draft**. Мержит владелица кнопкой; мерж через API запрещён — [`AI_OS/docs/rules/core/github-anti-abuse.md`](https://github.com/Arsid0305/AI_OS/blob/main/docs/rules/core/github-anti-abuse.md).
 
 ### Обязательные напоминания пользователю (проактивно)
 
@@ -105,16 +102,16 @@ git pull origin main
 
 ## Каноны (rules как атомы)
 
-Универсальные правила — в `docs/rules/core/*.md` (SSOT в AI_OS, синкается автоматически):
+Универсальные правила — в `AI_OS/docs/rules/core/*.md` (SSOT, копий в этом репо нет). Если AI_OS не подключён к сессии — попросить подключить, по памяти не работать:
 
-- Начало / конец сессии — [`docs/rules/core/session-lifecycle.md`](docs/rules/core/session-lifecycle.md)
-- Стиль общения / краткость — [`docs/rules/core/communication-style.md`](docs/rules/core/communication-style.md)
-- Git flow, запрет флагов, редактирование — [`docs/rules/core/git-flow.md`](docs/rules/core/git-flow.md)
-- GitHub anti-abuse — [`docs/rules/core/github-anti-abuse.md`](docs/rules/core/github-anti-abuse.md)
-- BIG / SMALL классификация — [`docs/rules/core/task-classification.md`](docs/rules/core/task-classification.md)
-- Принципы работы с кодом — [`docs/rules/core/code-principles.md`](docs/rules/core/code-principles.md)
-- Subagents (worktree, JSON-schema контракты) — [`docs/rules/core/subagents.md`](docs/rules/core/subagents.md)
-- Audit-триггер — [`docs/rules/core/audit-trigger.md`](docs/rules/core/audit-trigger.md)
+- Начало / конец сессии — [`AI_OS/docs/rules/core/session-lifecycle.md`](https://github.com/Arsid0305/AI_OS/blob/main/docs/rules/core/session-lifecycle.md)
+- Стиль общения / краткость — [`AI_OS/docs/rules/core/communication-style.md`](https://github.com/Arsid0305/AI_OS/blob/main/docs/rules/core/communication-style.md)
+- Git flow, запрет флагов, редактирование — [`AI_OS/docs/rules/core/git-flow.md`](https://github.com/Arsid0305/AI_OS/blob/main/docs/rules/core/git-flow.md)
+- GitHub anti-abuse — [`AI_OS/docs/rules/core/github-anti-abuse.md`](https://github.com/Arsid0305/AI_OS/blob/main/docs/rules/core/github-anti-abuse.md)
+- BIG / SMALL классификация — [`AI_OS/docs/rules/core/task-classification.md`](https://github.com/Arsid0305/AI_OS/blob/main/docs/rules/core/task-classification.md)
+- Принципы работы с кодом — [`AI_OS/docs/rules/core/code-principles.md`](https://github.com/Arsid0305/AI_OS/blob/main/docs/rules/core/code-principles.md)
+- Subagents (worktree, JSON-schema контракты) — [`AI_OS/docs/rules/core/subagents.md`](https://github.com/Arsid0305/AI_OS/blob/main/docs/rules/core/subagents.md)
+- Audit-триггер — [`AI_OS/docs/rules/core/audit-trigger.md`](https://github.com/Arsid0305/AI_OS/blob/main/docs/rules/core/audit-trigger.md)
 - Выбор модели `haiku`/`sonnet`/`opus` — `llm_wiki/wiki/workflow.md`
 - Context Mode — `llm_wiki/wiki/context-mode.md`
 - Универсальный audit-canon — `llm_wiki/wiki/audit-universal.md`
@@ -122,7 +119,7 @@ git pull origin main
 
 **Специфика Kino-app** (scoped): [`docs/rules/scoped/kino-app-specific.md`](docs/rules/scoped/kino-app-specific.md) — design-system маппинг, безопасность (verify_jwt/CORS/RLS/zod), стек, среда.
 
-Архитектура rules и правила синка — [`docs/rules/README.md`](docs/rules/README.md).
+Архитектура rules — [`AI_OS/docs/rules/README.md`](https://github.com/Arsid0305/AI_OS/blob/main/docs/rules/README.md).
 
 ---
 
@@ -135,7 +132,7 @@ git pull origin main
 ## Task Management
 
 - `tasks/todo.md` — план BIG задач, чекбоксы, отмечать выполненное
-- `tasks/lessons.md` — паттерны ошибок (формат — в [`docs/rules/core/session-lifecycle.md`](docs/rules/core/session-lifecycle.md) §«Формат lessons.md»)
+- `tasks/lessons.md` — паттерны ошибок (формат — в [`AI_OS/docs/rules/core/session-lifecycle.md`](https://github.com/Arsid0305/AI_OS/blob/main/docs/rules/core/session-lifecycle.md) §«Формат lessons.md»)
 - `docs/AUDIT_PROMPT.md` — тонкий overlay + ссылка на `llm_wiki/wiki/audit-universal.md`
 
 ---
@@ -147,7 +144,6 @@ _Проверено: 2026-08-19._
 - Vercel — фронтенд. **Автодеплой мёртв с 26.06.2026** (GitHub-интеграция отвалилась вместе с T&S-флагом). Деплой только ручной: `scripts/deploy.ps1` из отдельного клона (см. TEMPORARY-блок в начале файла).
 - Supabase — БД, Auth, Edge Functions (`ai-chat`, `movie-recommendation`), проект `ovhwxfdtkzwxfomdlgjv`. Деплой edge functions — вручную через Supabase MCP (`deploy_edge_function`) после мержа.
 - GitHub Actions — **фактически не работают** пока активен T&S-флаг. Файлы workflow сохранены, автоматически включатся когда флаг снимут:
-  - `automerge.yml` — PR `claude/**` / `cursor/**` → main через API (squash + deleteRef). Сейчас мерж через `mcp__github__merge_pull_request`.
   - `deploy.yml` — деплой Edge Functions при изменении `supabase/functions/**`. Сейчас через Supabase MCP.
 
 API-ключи в Supabase Secrets: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `DEEPSEEK_API_KEY`, `ALLOWED_ORIGINS`.
