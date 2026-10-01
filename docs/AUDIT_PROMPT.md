@@ -23,7 +23,7 @@ Design System: git submodule kino-design-system/ (github.com/Arsid0305/design-sy
 - [ ] Обе функции (`ai-chat`, `movie-recommendation`) имеют `verify_jwt: true`
 - [ ] Каждая функция валидирует JWT через `supabase.auth.getUser(token)` → 401 при невалидном
 - [ ] `user_id` берётся из верифицированного токена, НЕ из тела запроса
-- [ ] CORS ограничен: `Access-Control-Allow-Origin: https://kino-app.vercel.app` (не `*`)
+- [ ] CORS ограничен: `Access-Control-Allow-Origin` — только домены из `ALLOWED_ORIGINS` / fallback в `_shared/cors.ts` (не `*`)
 - [ ] Входные данные валидируются через `zod` до обращения к БД
 
 **Auth / RLS:**
@@ -42,7 +42,7 @@ Design System: git submodule kino-design-system/ (github.com/Arsid0305/design-sy
 
 **API-ключи (в Supabase Secrets):**
 - [ ] `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `DEEPSEEK_API_KEY` — все существуют
-- [ ] `ALLOWED_ORIGINS` содержит `https://kino-app.vercel.app`
+- [ ] `ALLOWED_ORIGINS` содержит прод-домен (сейчас `https://kino-arsid.vercel.app`, сверить с Vercel)
 
 ## Формат отчёта
 

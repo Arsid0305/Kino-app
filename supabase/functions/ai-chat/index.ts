@@ -2,10 +2,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, isOriginAllowed } from "../_shared/cors.ts";
-import { ALL_PROVIDERS, callWithFallback, type ChatMessage, type Provider } from "../_shared/llm.ts";
-const MAX_MESSAGES = 20;
-const MAX_MESSAGE_LENGTH = 2000;
-const MAX_TOTAL_MESSAGE_LENGTH = 12000;
+import { callWithFallback } from "../_shared/llm.ts";
+import { chatBody, forbiddenSet, isForbidden } from "../_shared/input.ts";
 const MAX_MOVIES = 30;
 const MAX_REQUESTS_PER_MINUTE = 10;
 // Admin client for rate limiting — uses service role key, persists across cold starts
@@ -20,6 +18,8 @@ async function tavilySearch(query: string): Promise<string> {
   try {
     const res = await fetch("https://api.tavily.com/search", {
       method: "POST",
+      // Поиск — подсказка, не обязательная часть ответа: зависший Tavily не держит запрос.
+      signal: AbortSignal.timeout(10_000),
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${key}` },
       body: JSON.stringify({ query, search_depth: "basic", max_results: 3, include_answer: true }),
     });
@@ -39,12 +39,6 @@ async function tavilySearch(query: string): Promise<string> {
   }
 }
 
-function sanitizeTasteProfile(raw: string): string {
-  return raw
-    .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '')
-    .replace(/\n{3,}/g, '\n\n')
-    .slice(0, 2000);
-}
 
 function jsonResponse(origin: string | null, status: number, payload: Record<string, unknown>) {
   return new Response(JSON.stringify(payload), {
@@ -69,13 +63,7 @@ async function checkRateLimit(key: string): Promise<boolean> {
   return data as boolean;
 }
 
-function isChatMessage(value: unknown): value is ChatMessage {
-  if (!value || typeof value !== "object") return false;
-  const c = value as Record<string, unknown>;
-  return (c.role === "user" || c.role === "assistant") && typeof c.content === "string";
-}
 
-type MovieCtx = { titleRu?: string; title?: string };
 
 serve(async req => {
   const origin = req.headers.get("Origin");
@@ -107,44 +95,14 @@ serve(async req => {
     const rateLimitKey = user.id;
     if (!await checkRateLimit(rateLimitKey)) return jsonResponse(origin, 429, { error: "Слишком много запросов. Подождите минуту." });
 
-    const body = await req.json().catch(() => null) as {
-      provider?: unknown;
-      mode?: unknown;
-      messages?: unknown;
-      filters?: unknown;
-      tasteProfile?: unknown;
-      watchedMovies?: unknown;
-      watchlistMovies?: unknown;
-      dismissedMovies?: unknown;
-      forbiddenTitles?: unknown;
-    } | null;
-
-    if (!body || typeof body !== "object") return jsonResponse(origin, 400, { error: "Некорректное тело запроса" });
-
-    const { messages } = body;
-    if (!Array.isArray(messages) || messages.length === 0 || messages.length > MAX_MESSAGES) {
-      return jsonResponse(origin, 400, { error: "Неверные данные запроса" });
-    }
-
-    for (const message of messages) {
-      if (!isChatMessage(message) || message.content.length > MAX_MESSAGE_LENGTH) {
-        return jsonResponse(origin, 400, { error: "Сообщение слишком длинное или имеет неверный формат" });
-      }
-    }
-
-    const safeMessages = messages as ChatMessage[];
-    const totalLen = safeMessages.reduce((s, m) => s + m.content.length, 0);
-    if (totalLen > MAX_TOTAL_MESSAGE_LENGTH) return jsonResponse(origin, 400, { error: "Диалог слишком длинный" });
-
-    const provider: Provider = ALL_PROVIDERS.includes(body.provider as Provider)
-      ? (body.provider as Provider) : "gpt4o";
-    const mode: "chat" | "title_lookup" = body.mode === "title_lookup" ? "title_lookup" : "chat";
-
-    const filters = Array.isArray(body.filters) ? body.filters.map(String).slice(0, 12) : [];
-    const tasteProfile = typeof body.tasteProfile === "string" ? sanitizeTasteProfile(body.tasteProfile) : "";
-    const watchedMovies = Array.isArray(body.watchedMovies) ? body.watchedMovies.slice(0, MAX_MOVIES) : [];
-    const watchlistMovies = Array.isArray(body.watchlistMovies) ? body.watchlistMovies.slice(0, MAX_MOVIES) : [];
-    const dismissedMovies = Array.isArray(body.dismissedMovies) ? body.dismissedMovies.slice(0, MAX_MOVIES) : [];
+    const parsedBody = chatBody.safeParse(await req.json().catch(() => null));
+    if (!parsedBody.success) return jsonResponse(origin, 400, { error: "Неверные данные запроса" });
+    const body = parsedBody.data;
+    const { provider, mode, filters, tasteProfile } = body;
+    const safeMessages = body.messages;
+    const watchedMovies = body.watchedMovies.slice(0, MAX_MOVIES);
+    const watchlistMovies = body.watchlistMovies.slice(0, MAX_MOVIES);
+    const dismissedMovies = body.dismissedMovies.slice(0, MAX_MOVIES);
 
     const lastUserMsg = safeMessages.filter(m => m.role === "user").at(-1)?.content ?? "";
 
@@ -180,9 +138,9 @@ serve(async req => {
       ? `\n=== АКТУАЛЬНЫЕ ДАННЫЕ ИЗ ИНТЕРНЕТА ===\n${searchContext}\n=== КОНЕЦ ДАННЫХ ===\n`
       : "";
 
-    const watchedTitles = (watchedMovies as MovieCtx[]).map(m => m.titleRu ?? m.title ?? "").filter(Boolean).join(", ");
-    const watchlistTitles = (watchlistMovies as MovieCtx[]).map(m => m.titleRu ?? m.title ?? "").filter(Boolean).join(", ");
-    const dismissedTitles = (dismissedMovies as MovieCtx[]).map(m => m.titleRu ?? m.title ?? "").filter(Boolean).join(", ");
+    const watchedTitles = watchedMovies.map(m => m.titleRu ?? m.title ?? "").filter(Boolean).join(", ");
+    const watchlistTitles = watchlistMovies.map(m => m.titleRu ?? m.title ?? "").filter(Boolean).join(", ");
+    const dismissedTitles = dismissedMovies.map(m => m.titleRu ?? m.title ?? "").filter(Boolean).join(", ");
 
     const titleLookupPrompt = `Ты — кинокаталог. Сегодняшняя дата: ${currentDate}. ${oscarNote}
 ${searchSection}
@@ -312,43 +270,21 @@ ${tasteProfile || "еще формируется"}
       return null;
     }
 
-    let parsed: { reply?: string; suggestions?: unknown[] };
     const extracted = extractFirstJson(raw);
     if (!extracted) {
       return jsonResponse(origin, 200, { message: raw, suggestions: [] });
     }
-    parsed = extracted as { reply?: string; suggestions?: unknown[] };
+    const parsed = extracted as { reply?: string; suggestions?: unknown[] };
 
     const reply = typeof parsed.reply === "string" ? parsed.reply.trim() : raw;
     const rawSuggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
 
-    // В промпт уходит только MAX_MOVIES из каждого списка, но фильтровать
-    // ответ модели надо по всем: клиент шлёт полный набор titleRu в
-    // body.forbiddenTitles. Пока клиент старый и поле не пришло — деградируем
-    // на прежний расчёт из объектов.
-    const normalizeTitle = (v: string) => v.trim().toLowerCase().replace(/\s+/g, " ");
-    const clientForbidden = Array.isArray(body.forbiddenTitles)
-      ? body.forbiddenTitles.filter((v: unknown): v is string => typeof v === "string")
-      : null;
-    const forbiddenTitleSet = clientForbidden
-      ? new Set(clientForbidden.map(normalizeTitle).filter(Boolean))
-      : new Set(
-          [
-            ...(watchedMovies as MovieCtx[]),
-            ...(watchlistMovies as MovieCtx[]),
-            ...(dismissedMovies as MovieCtx[]),
-          ]
-            .map(m => normalizeTitle(m.titleRu ?? m.title ?? ""))
-            .filter(Boolean)
-        );
-
-    const suggestions = mode === "title_lookup" ? rawSuggestions.slice(0, 1) : rawSuggestions.filter(s => {
-      if (!s || typeof s !== "object") return true;
-      const mov = s as Record<string, unknown>;
-      const titleRu = typeof mov.titleRu === "string" ? mov.titleRu.toLowerCase().trim() : "";
-      const title = typeof mov.title === "string" ? mov.title.toLowerCase().trim() : "";
-      return !forbiddenTitleSet.has(titleRu) && !forbiddenTitleSet.has(title);
-    });
+    // Фильтр — по полному списку названий от клиента (forbiddenTitles), а не только
+    // по MAX_MOVIES, ушедшим в промпт.
+    const forbidden = forbiddenSet(body);
+    const suggestions = mode === "title_lookup"
+      ? rawSuggestions.filter(s => s && typeof s === "object").slice(0, 1)
+      : rawSuggestions.filter(s => !isForbidden(s, forbidden));
 
     return jsonResponse(origin, 200, { message: reply, suggestions });
 
