@@ -53,12 +53,6 @@ function jsonResponse(origin: string | null, status: number, payload: Record<str
   });
 }
 
-function getClientIp(req: Request): string {
-  return req.headers.get("x-forwarded-for")?.split(",")[0].trim()
-    ?? req.headers.get("cf-connecting-ip")
-    ?? req.headers.get("x-real-ip")
-    ?? "unknown";
-}
 
 async function checkRateLimit(key: string): Promise<boolean> {
   const { data, error } = await supabaseAdmin.rpc("check_and_increment_rate_limit", {
@@ -108,7 +102,9 @@ serve(async req => {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) return jsonResponse(origin, 401, { error: "Неверный токен доступа" });
 
-    const rateLimitKey = `${user.id}:${getClientIp(req)}`;
+    // Ключ только по user.id: X-Forwarded-For задаёт клиент, с IP в ключе
+    // каждый новый заголовок давал новое окно лимита.
+    const rateLimitKey = user.id;
     if (!await checkRateLimit(rateLimitKey)) return jsonResponse(origin, 429, { error: "Слишком много запросов. Подождите минуту." });
 
     const body = await req.json().catch(() => null) as {
