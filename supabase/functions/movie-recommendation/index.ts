@@ -1,7 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, isOriginAllowed } from "../_shared/cors.ts";
-import { ALL_PROVIDERS, callWithFallback, type Provider } from "../_shared/llm.ts";
+import { callWithFallback } from "../_shared/llm.ts";
+import { forbiddenSet, isForbidden, recommendationBody } from "../_shared/input.ts";
 
 const MAX_REQUESTS_PER_MINUTE = 10;
 const MAX_MOVIES = 80;
@@ -32,21 +33,12 @@ async function checkRateLimit(key: string): Promise<boolean> {
   return data as boolean;
 }
 
-function sanitizeTasteProfile(raw: string): string {
-  return raw
-    .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '')
-    .replace(/\n{3,}/g, '\n\n')
-    .slice(0, 2000);
-}
 
-function isMovieContext(value: unknown): boolean {
-  return Boolean(value) && typeof value === "object";
-}
 
 type MovieCtx = { titleRu?: string; title?: string };
 
-function titlesOf(arr: unknown[]): string {
-  return (arr as MovieCtx[]).map(m => m.titleRu ?? m.title ?? "").filter(Boolean).join(", ");
+function titlesOf(arr: MovieCtx[]): string {
+  return arr.map(m => m.titleRu ?? m.title ?? "").filter(Boolean).join(", ");
 }
 
 // Извлечь JSON из ответа модели — с обрезкой markdown-обёртки и с ручным
@@ -120,51 +112,20 @@ serve(async req => {
     const rateLimitKey = user.id;
     if (!await checkRateLimit(rateLimitKey)) return jsonResponse(origin, 429, { error: "Слишком много запросов. Подождите минуту." });
 
-    const body = await req.json().catch(() => null) as {
-      provider?: unknown;
-      filters?: unknown;
-      tasteProfile?: unknown;
-      watchedMovies?: unknown;
-      watchlistMovies?: unknown;
-      dismissedMovies?: unknown;
-      forbiddenTitles?: unknown;
-    } | null;
-
-    if (!body || typeof body !== "object") return jsonResponse(origin, 400, { error: "Некорректное тело запроса" });
-
+    const parsedBody = recommendationBody.safeParse(await req.json().catch(() => null));
+    if (!parsedBody.success) return jsonResponse(origin, 400, { error: "Некорректное тело запроса" });
+    const body = parsedBody.data;
     // Пользователь выбирает провайдера в UI, дефолт — gpt4o. Если он не ответил —
     // фолбэк по цепочке из _shared/llm.ts (один живой ключ достаточен).
-    const provider: Provider = ALL_PROVIDERS.includes(body.provider as Provider)
-      ? (body.provider as Provider) : "gpt4o";
-
-    const filters = Array.isArray(body.filters) ? body.filters.map(String).slice(0, 12) : [];
-    const tasteProfile = typeof body.tasteProfile === "string" ? sanitizeTasteProfile(body.tasteProfile) : "";
-    const watchedMovies = Array.isArray(body.watchedMovies)
-      ? body.watchedMovies.filter(isMovieContext).slice(0, MAX_MOVIES) : [];
-    const watchlistMovies = Array.isArray(body.watchlistMovies)
-      ? body.watchlistMovies.filter(isMovieContext).slice(0, MAX_MOVIES) : [];
-    const dismissedMovies = Array.isArray(body.dismissedMovies)
-      ? body.dismissedMovies.filter(isMovieContext).slice(0, MAX_MOVIES) : [];
+    const { provider, filters, tasteProfile } = body;
+    const watchedMovies = body.watchedMovies.slice(0, MAX_MOVIES);
+    const watchlistMovies = body.watchlistMovies.slice(0, MAX_MOVIES);
+    const dismissedMovies = body.dismissedMovies.slice(0, MAX_MOVIES);
 
     const watchedTitles = titlesOf(watchedMovies.slice(0, 40));
     const watchlistTitles = titlesOf(watchlistMovies.slice(0, 40));
     const dismissedTitles = titlesOf(dismissedMovies.slice(0, 40));
-
-    const normalizeTitle = (v: string) => v.trim().toLowerCase().replace(/\s+/g, " ");
-    const clientForbidden = Array.isArray(body.forbiddenTitles)
-      ? body.forbiddenTitles.filter((v: unknown): v is string => typeof v === "string")
-      : null;
-    const forbiddenTitleSet = clientForbidden
-      ? new Set(clientForbidden.map(normalizeTitle).filter(Boolean))
-      : new Set(
-          [
-            ...(watchedMovies as MovieCtx[]),
-            ...(watchlistMovies as MovieCtx[]),
-            ...(dismissedMovies as MovieCtx[]),
-          ]
-            .map(m => normalizeTitle(m.titleRu ?? m.title ?? ""))
-            .filter(Boolean)
-        );
+    const forbiddenTitleSet = forbiddenSet(body);
 
     const forbidden = [watchedTitles, watchlistTitles, dismissedTitles]
       .filter(Boolean).join(", ");
@@ -176,13 +137,12 @@ serve(async req => {
       name => Deno.env.get(name),
       extractRecommendations,
     );
-    const picked = rawResults.filter(movie => {
-      const titleRu = typeof movie.titleRu === "string" ? movie.titleRu.toLowerCase().trim() : "";
-      const title = typeof movie.title === "string" ? movie.title.toLowerCase().trim() : "";
-      const allowed = !forbiddenTitleSet.has(titleRu) && !forbiddenTitleSet.has(title);
-      if (!allowed) console.log(`Отфильтровано (запрещено): ${movie.titleRu ?? movie.title}`);
-      return allowed;
-    }).slice(0, 2);
+    const allowed = rawResults.filter(movie => !isForbidden(movie, forbiddenTitleSet));
+    if (allowed.length < rawResults.length) {
+      // Без названий: это данные пользователя, в логах достаточно счётчика.
+      console.log(`Отфильтровано уже просмотренного: ${rawResults.length - allowed.length} из ${rawResults.length}`);
+    }
+    const picked = allowed.slice(0, 2);
 
     if (picked.length === 0) return jsonResponse(origin, 500, { error: "Не удалось получить рекомендации" });
 

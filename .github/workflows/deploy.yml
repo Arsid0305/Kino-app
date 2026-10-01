@@ -7,6 +7,9 @@ on:
     paths:
       - 'supabase/functions/**'
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -15,7 +18,7 @@ jobs:
 
       - uses: supabase/setup-cli@2b81a2f4f21fc45c34bc5c4a24ddc2b31e2c34fe  # v1.1.1
         with:
-          version: latest
+          version: 2.20.5  # закреплено: latest менял поведение без коммита (сверить при снятии блока Actions)
 
       - name: Verify ALLOWED_ORIGINS secret не пуст (защита от CORS-fallback)
         env:

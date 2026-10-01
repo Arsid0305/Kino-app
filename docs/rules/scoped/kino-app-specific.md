@@ -29,9 +29,9 @@ Submodule `kino-design-system/` → `github.com/Arsid0305/design-system`. Ини
 
 - `service_role` только в Supabase / GitHub Secrets, **никогда во `VITE_*`**
 - `verify_jwt: true` в `supabase/config.toml` для обеих функций (закоммичено)
-- CORS whitelist — hardcoded fallback (`https://kino-app.vercel.app`) + `ALLOWED_ORIGINS` secret (валидация в `deploy.yml`)
+- CORS whitelist — hardcoded fallback в `supabase/functions/_shared/cors.ts` (`kino-arsid`, `kino-app-arsid`, `kino-app-git-main-arsid` на `vercel.app`) + `ALLOWED_ORIGINS` secret (валидация в `deploy.yml`)
 - RLS через `auth.uid() = user_id` на всех `public.*` таблицах
-- `zod`-валидация всех входных данных в Edge Functions (TODO)
+- `zod`-валидация входных данных в Edge Functions — `supabase/functions/_shared/input.ts`
 
 ## Стек
 
