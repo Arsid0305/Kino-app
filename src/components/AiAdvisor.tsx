@@ -15,6 +15,7 @@ import { buildFilterSummary, buildTasteProfileSummary, toMovieContext } from '@/
 import { loadChatMessages, saveChatMessage, StoredChatMessage } from '@/lib/chatStore';
 import { getMovieDedupKey, getTitleOnlyKey } from '@/lib/movieIdentity';
 import { ProviderIcon } from '@/components/ProviderIcon';
+import { providerTabClass } from '@/lib/providerTab';
 
 type AdvisorMessage = {
   id: string;
@@ -293,9 +294,7 @@ export const AiAdvisor = ({
                     <button
                       key={p.id}
                       onClick={() => handleSetProvider(p.id)}
-                      className={`flex flex-1 items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                        provider === p.id ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'
-                      }`}
+                      className={providerTabClass(provider === p.id)}
                     >
                       <ProviderIcon id={p.id} />
                       <span>{p.label}</span>
