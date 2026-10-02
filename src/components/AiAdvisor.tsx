@@ -208,7 +208,8 @@ export const AiAdvisor = ({
           messages: nextConversation.map(m => ({ role: m.role, content: m.content })),
           filters: buildFilterSummary(filters),
           tasteProfile: buildTasteProfileSummary(watchedMovies, watchlistMovies),
-          watchedMovies: watchedMovies.slice(0, MAX_MOVIES_IN_CONTEXT).map(toMovieContext),
+          // Просмотренных — больше: иначе модель предлагает уже виденное (2026-10-02).
+          watchedMovies: watchedMovies.slice(0, 200).map(toMovieContext),
           watchlistMovies: watchlistMovies.slice(0, MAX_MOVIES_IN_CONTEXT).map(toMovieContext),
           dismissedMovies: dismissedMovies.slice(0, MAX_MOVIES_IN_CONTEXT).map(toMovieContext),
           // Полный чёрный список названий — нужен серверу для пост-фильтра.
