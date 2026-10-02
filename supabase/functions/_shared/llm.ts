@@ -140,8 +140,9 @@ export async function callProvider(
       const generationConfig: Record<string, unknown> = { maxOutputTokens: MAX_TOKENS, temperature: req.temperature };
       if (req.json && !req.geminiSearch) generationConfig.responseMimeType = "application/json";
       const d = await post(fetchFn,
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
-        {},
+        // Ключ в заголовке, а не в URL: URL попадает в исключения fetch и логи.
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+        { "x-goog-api-key": key },
         {
           system_instruction: { parts: [{ text: req.system }] },
           contents,
