@@ -4,7 +4,9 @@ import { extractFirstJson, guardRequest, jsonResponse } from "../_shared/http.ts
 import { callWithFallback } from "../_shared/llm.ts";
 import { chatBody, forbiddenSet, isForbidden } from "../_shared/input.ts";
 
-const MAX_MOVIES = 30;
+// Сколько названий из каждого списка уходит в промпт. Было по 30 — модель
+// предлагала уже просмотренное, фильтр отсеивал 2 из 2 карточек (лог 2026-10-02).
+const PROMPT_TITLES = { watched: 150, watchlist: 30, dismissed: 20 } as const;
 
 async function tavilySearch(query: string): Promise<string> {
   const key = Deno.env.get("TAVILY_API_KEY");
@@ -45,9 +47,9 @@ serve(async req => {
     const body = parsedBody.data;
     const { provider, mode, filters, tasteProfile } = body;
     const safeMessages = body.messages;
-    const watchedMovies = body.watchedMovies.slice(0, MAX_MOVIES);
-    const watchlistMovies = body.watchlistMovies.slice(0, MAX_MOVIES);
-    const dismissedMovies = body.dismissedMovies.slice(0, MAX_MOVIES);
+    const watchedMovies = body.watchedMovies.slice(0, PROMPT_TITLES.watched);
+    const watchlistMovies = body.watchlistMovies.slice(0, PROMPT_TITLES.watchlist);
+    const dismissedMovies = body.dismissedMovies.slice(0, PROMPT_TITLES.dismissed);
 
     const lastUserMsg = safeMessages.filter(m => m.role === "user").at(-1)?.content ?? "";
 
@@ -188,6 +190,9 @@ ${tasteProfile || "еще формируется"}
 - genre и mood — на русском`;
 
     const systemPrompt = mode === "title_lookup" ? titleLookupPrompt : chatPrompt;
+    // Для оценки стоимости: ~1 токен на 3 символа кириллицы (грубо).
+    const promptChars = systemPrompt.length + safeMessages.reduce((n, m) => n + m.content.length, 0);
+    console.log(`Промпт чата: ${promptChars} символов, ~${Math.round(promptChars / 3)} токенов`);
 
     const { result: raw } = await callWithFallback(
       provider,

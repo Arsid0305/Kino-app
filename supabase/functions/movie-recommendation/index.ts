@@ -3,7 +3,11 @@ import { extractFirstJson, guardRequest, jsonResponse } from "../_shared/http.ts
 import { callWithFallback } from "../_shared/llm.ts";
 import { forbiddenSet, isForbidden, recommendationBody } from "../_shared/input.ts";
 
-const MAX_MOVIES = 80;
+const MAX_MOVIES = 200;
+// Сколько названий из каждого списка уходит в промпт. Было по 40 — модель не
+// видела большую часть просмотренного и предлагала его, а пост-фильтр отсеивал
+// 2 из 3 карточек (лог 2026-10-02). Полный список всё равно применяется фильтром.
+const PROMPT_TITLES = { watched: 150, watchlist: 30, dismissed: 20 } as const;
 
 type MovieCtx = { titleRu?: string; title?: string };
 
@@ -45,14 +49,16 @@ serve(async req => {
     const watchlistMovies = body.watchlistMovies.slice(0, MAX_MOVIES);
     const dismissedMovies = body.dismissedMovies.slice(0, MAX_MOVIES);
 
-    const watchedTitles = titlesOf(watchedMovies.slice(0, 40));
-    const watchlistTitles = titlesOf(watchlistMovies.slice(0, 40));
-    const dismissedTitles = titlesOf(dismissedMovies.slice(0, 40));
+    const watchedTitles = titlesOf(watchedMovies.slice(0, PROMPT_TITLES.watched));
+    const watchlistTitles = titlesOf(watchlistMovies.slice(0, PROMPT_TITLES.watchlist));
+    const dismissedTitles = titlesOf(dismissedMovies.slice(0, PROMPT_TITLES.dismissed));
     const forbiddenTitleSet = forbiddenSet(body);
 
     const forbidden = [watchedTitles, watchlistTitles, dismissedTitles]
       .filter(Boolean).join(", ");
     const userPrompt = buildUserPrompt(forbidden, filters, tasteProfile);
+    // Для оценки стоимости: ~1 токен на 3 символа кириллицы (грубо).
+    console.log(`Промпт подбора: ${userPrompt.length + SYSTEM_PROMPT.length} символов, ~${Math.round((userPrompt.length + SYSTEM_PROMPT.length) / 3)} токенов`);
 
     const { result: rawResults, provider: servedBy } = await callWithFallback(
       provider,

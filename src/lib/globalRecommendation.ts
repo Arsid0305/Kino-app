@@ -58,7 +58,8 @@ export async function requestGlobalRecommendation(
       provider,
       filters: buildFilterSummary(filters),
       tasteProfile: buildTasteProfileSummary(watched, watchlist),
-      watchedMovies: watched.slice(0, 80).map(toMovieContext),
+      // Просмотренных — больше: модель предлагает классику, которую уже видели (2026-10-02).
+      watchedMovies: watched.slice(0, 200).map(toMovieContext),
       watchlistMovies: watchlist.slice(0, 80).map(toMovieContext),
       dismissedMovies: dismissed.slice(0, 80).map(toMovieContext),
       // Полный чёрный список названий — нужен серверу для пост-фильтра.
