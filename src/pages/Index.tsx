@@ -39,6 +39,7 @@ import {
 } from '@/lib/supabaseMovieStore';
 import { requestGlobalRecommendation, type RecommendationProvider } from '@/lib/globalRecommendation';
 import { ProviderIcon } from '@/components/ProviderIcon';
+import { providerTabClass } from '@/lib/providerTab';
 import { searchMovieByTitle } from '@/lib/titleSearch';
 
 type Tab = 'recommend' | 'history';
@@ -489,11 +490,7 @@ const Index = () => {
                       key={p.id}
                       type="button"
                       onClick={() => setRecommendationProvider(p.id)}
-                      className={`flex flex-1 items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                        recommendationProvider === p.id
-                          ? 'bg-card text-foreground shadow-sm'
-                          : 'text-muted-foreground hover:text-foreground'
-                      }`}
+                      className={providerTabClass(recommendationProvider === p.id)}
                     >
                       <ProviderIcon id={p.id} />
                       {p.label}
