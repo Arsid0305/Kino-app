@@ -52,7 +52,7 @@ Submodule `kino-design-system/` → `github.com/Arsid0305/design-system`. Ини
 
 `signInWithOtp({ email })` → `verifyOtp({ email, token, type: 'email' })`. Код — **8 цифр** (не 6).
 
-## Среда Claude
+## Среда облачной сессии ИИ
 - Node.js v22, npm v10, Vitest ✅
 - Python / Supabase CLI / Deno ❌
 - `.env` реальный ❌
